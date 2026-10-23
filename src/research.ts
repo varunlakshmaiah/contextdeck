@@ -2,18 +2,12 @@
  * Research for ✨ Set up: platform facts + a web search for the app's current shortcuts, status APIs and info sources.
  * Results are condensed by the model into a digest, cached per app version in ~/.contextdeck/research/.
  */
-import { run } from "./mac";
+import type { PlatformFacts } from "./platform/types";
 import type { SecretStore } from "./secrets";
 import type { ResearchSettings } from "./types";
 
-export interface Platform {
-	os: string;            // "macOS 26.1"
-	arch: string;          // "arm64"
-	keyboard: string;      // "U.S.", "British", "German" …
-	locale: string;        // "en-IN"
-	appVersion?: string;   // CFBundleShortVersionString of the app
-	browser?: string;      // for sites
-}
+/** Platform facts passed to research and the setup prompt. */
+export type Platform = PlatformFacts;
 
 export interface SearchHit { title: string; url: string; snippet: string }
 
@@ -25,32 +19,6 @@ export interface Digest {
 	apis: { name: string; docs?: string; auth?: string; secret?: string; hosts?: string[] }[];
 	notes?: string;
 	sources: string[];
-}
-
-// ---------- platform ----------
-
-export async function platformFacts(bundleId?: string): Promise<Platform> {
-	const safe = async (f: () => Promise<string>) => { try { return (await f()).trim(); } catch { return ""; } };
-	const ver = await safe(() => run("/usr/bin/sw_vers", ["-productVersion"]));
-	const arch = await safe(() => run("/usr/bin/uname", ["-m"]));
-	const sources = await safe(() => run("/usr/bin/defaults", ["read", `${process.env.HOME}/Library/Preferences/com.apple.HIToolbox.plist`, "AppleSelectedInputSources"]));
-	const keyboard = /"KeyboardLayout Name"\s*=\s*"?([^";\n]+)"?/.exec(sources)?.[1]?.trim() ?? "U.S.";
-	let appVersion: string | undefined;
-	if (bundleId) appVersion = (await appVersionOf(bundleId)) || undefined;
-	return { os: `macOS ${ver || "?"}`, arch: arch || "?", keyboard, locale: Intl.DateTimeFormat().resolvedOptions().locale, appVersion };
-}
-
-const versionCache = new Map<string, string>();
-/** App version from its bundle's Info.plist (found via Spotlight). Cached per run. */
-export async function appVersionOf(bundleId: string): Promise<string> {
-	if (versionCache.has(bundleId)) return versionCache.get(bundleId)!;
-	let v = "";
-	try {
-		const path = (await run("/usr/bin/mdfind", [`kMDItemCFBundleIdentifier == '${bundleId.replace(/'/g, "")}'`], { timeout: 4000 })).split("\n").find((p) => p.endsWith(".app"));
-		if (path) v = (await run("/usr/bin/plutil", ["-extract", "CFBundleShortVersionString", "raw", "-o", "-", `${path}/Contents/Info.plist`])).trim();
-	} catch { /* unknown */ }
-	versionCache.set(bundleId, v);
-	return v;
 }
 
 // ---------- search providers ----------

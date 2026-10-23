@@ -2,10 +2,10 @@ import { EventEmitter } from "node:events";
 import { deleteLayout, LAYOUTS_DIR, writeLayout } from "./config";
 import { evaluate, intervalMs, type InfoResult } from "./info";
 import { askLLM, configuredProviders, parseChoices, providerName, type AskOptions } from "./llm";
-import * as mac from "./mac";
-import { menuClickScript, scanMenus, usefulEntries, type MenuEntry } from "./menus";
+import { usefulEntries, type MenuEntry } from "./menus";
+import { platform, setCmdKey, type Platform as OsPlatform } from "./platform";
 import { loadIcons, renderDial, renderKey, toDataUrl } from "./render";
-import { appVersionOf, digestPrompt, fetchPage, platformFacts, queriesFor, rankHits, search, type Digest, type Platform, type SearchHit } from "./research";
+import { digestPrompt, fetchPage, queriesFor, rankHits, search, type Digest, type Platform, type SearchHit } from "./research";
 import { DIAL_COUNT, KEY_COUNT, levelOf, normalize, pick, resolve, template } from "./resolve";
 import { keychainStore, MissingSecretError, withSecrets, type SecretStore } from "./secrets";
 import { ICON_HINTS, buildPrompt, extractJson, planToLayout, targetForApp, targetForSite, type SetupTarget } from "./setup";
@@ -23,6 +23,7 @@ const SETUP_COLOR = "#A78BFA";
 const NEEDS_KEY_COLOR = "#FBBF24";
 /** Never offer setup for these (system UI, the deck itself, search engines). */
 const SETUP_IGNORE = ["com.apple.finder", "com.apple.loginwindow", "com.apple.dock", "com.apple.systemuiserver", "com.apple.Spotlight", "com.apple.controlcenter", "com.apple.notificationcenterui", "com.elgato.StreamDeck", "com.apple.ScreenSaver.Engine", "com.apple.SecurityAgent", "com.apple.UserNotificationCenter",
+	"explorer.exe", "searchhost.exe", "searchapp.exe", "shellexperiencehost.exe", "startmenuexperiencehost.exe", "lockapp.exe", "streamdeck.exe", "applicationframehost.exe", "gnome-shell", "plasmashell", "opendeck", "xfdesktop", "nautilus-desktop",
 	"google.com", "search.brave.com", "bing.com", "duckduckgo.com", "perplexity.ai", "localhost"];
 const NON_WEB = /^(newtab|about|chrome|edge|brave|arc|file|data|blob|devtools|chrome-extension)/i;
 
@@ -98,18 +99,18 @@ export class Engine extends EventEmitter {
 	versions = new Map<string, string>();            // bundle id -> installed app version
 
 	deps: EngineDeps = {
-		scanMenus: (b) => scanMenus(b),
+		scanMenus: (b) => this.os.scanMenus(b),
 		ask: async (o) => (await askLLM(this.settings, { ...o, provider: o.provider ?? this.llm })).text,
 		writeLayout: (l) => writeLayout(l),
 		removeLayout: (id) => void deleteLayout(id),
 		saveSetupState: () => undefined,
 		savePrefs: () => undefined,
-		openFile: async (p) => void (await mac.run("/usr/bin/open", p.endsWith(".json") ? ["-t", p] : [p])),
+		openFile: (p) => this.os.open(p),
 		icons: () => loadIcons(),
 		secrets: keychainStore(),
-		prompt: (t, m) => mac.promptHidden(t, m),
-		platform: (b) => platformFacts(b),
-		appVersion: (b) => appVersionOf(b),
+		prompt: (t, m) => this.os.prompt(t, m),
+		platform: (b) => this.os.facts(b),
+		appVersion: (b) => this.os.appVersion(b),
 		search: (q) => search(q, this.settings.research ?? {}, this.deps.secrets),
 		fetchPage: (u) => fetchPage(u),
 		loadResearch: () => undefined,
@@ -123,6 +124,9 @@ export class Engine extends EventEmitter {
 		this.resolved = resolve(this.config, this.ctx);
 	}
 
+	/** The OS adapter (swap with setPlatform() in tests). */
+	get os(): OsPlatform { return platform(); }
+	get browsers(): string[] { return [...this.os.browsers, ...(this.settings.browsers ?? [])]; }
 	get settings() { return this.config.settings ?? {}; }
 	get accent() { return this.settings.accent ?? DEFAULT_ACCENT; }
 	get bg() { return this.settings.background ?? DEFAULT_BG; }
@@ -133,6 +137,7 @@ export class Engine extends EventEmitter {
 		this.configErrors = errors;
 		if (cfg) {
 			this.config = cfg;
+			setCmdKey(cfg.settings?.cmdKey);
 			this.needsTitle = cfg.layouts.some((l) => !!l.match?.title && !l.match?.url);
 		}
 		if (errors.length) this.log(`Config errors:\n${errors.join("\n")}`);
@@ -160,10 +165,10 @@ export class Engine extends EventEmitter {
 	stop() { clearTimeout(this.pollTimer); clearTimeout(this.infoTimer); }
 
 	async detect() {
-		const front = await mac.frontmost();
+		const front = await this.os.frontmost();
 		let url = "", title = "", urlError = "", sub = "";
-		if (mac.BROWSERS.includes(front.bundleId)) {
-			const tab = await mac.browserTab(front.bundleId).catch((e) => {
+		if (this.browsers.includes(front.bundleId)) {
+			const tab = await this.os.browserTab(front.bundleId).catch((e) => {
 				urlError = ((e as { stderr?: string }).stderr || (e as Error).message).trim().slice(0, 200);
 				return { url: this.ctx.url, title: this.ctx.title };
 			});
@@ -176,8 +181,8 @@ export class Engine extends EventEmitter {
 				const due = front.bundleId !== this.ctx.bundleId || (this.probeAt.get(front.bundleId) ?? 0) + (probe?.every ?? 1.5) * 1000 <= Date.now();
 				if (due) {
 					this.probeAt.set(front.bundleId, Date.now());
-					if (probe?.type === "applescript") sub = (await mac.osascript(probe.script, 2500).catch(() => "")).slice(0, 200);
-					if (probe?.type === "windowTitle" || this.needsTitle) title = await mac.windowTitle().catch(() => "");
+					if (probe?.type === "applescript" || probe?.type === "script") sub = (await this.os.runScript(probe.script, probe.type === "script" ? probe.lang : "applescript", 2500).catch(() => "")).slice(0, 200);
+					if (probe?.type === "windowTitle" || this.needsTitle) title = await this.os.windowTitle().catch(() => "");
 					if (probe?.type === "windowTitle") sub = title;
 				} else { sub = this.ctx.sub; title = this.ctx.title; }
 			}
@@ -417,7 +422,7 @@ export class Engine extends EventEmitter {
 	private async refreshVolume() {
 		if (!this.resolved.dials.some((d) => d?.kind === "volume")) return;
 		try {
-			const v = await mac.getVolume();
+			const v = await this.os.getVolume();
 			if (v !== this.volume) { this.volume = v; this.resolved.dials.forEach((d, i) => d?.kind === "volume" && this.drawDial(i)); }
 		} catch { /* ignore */ }
 	}
@@ -520,7 +525,7 @@ export class Engine extends EventEmitter {
 		if (d.kind === "volume") {
 			this.volume = Math.max(0, Math.min(100, this.volume + ticks * (d.step ?? 3)));
 			this.drawDial(index);
-			await mac.setVolume(this.volume).catch(() => undefined);
+			await this.os.setVolume(this.volume).catch(() => undefined);
 		} else if (d.kind === "value") {
 			const step = d.step ?? 1;
 			const v = Math.max(d.min ?? 0, Math.min(d.max ?? 100, this.numValue(d) + ticks * step));
@@ -539,7 +544,7 @@ export class Engine extends EventEmitter {
 
 	dialPress(index: number) {
 		const d = this.resolved.dials[index];
-		if (d?.kind === "volume" && !d.press) return void mac.toggleMute().catch(() => undefined);
+		if (d?.kind === "volume" && !d.press) return void this.os.toggleMute().catch(() => undefined);
 		if (d?.press) void this.exec(d.press, -1, this.resolved.dialOwners[index]);
 	}
 
@@ -609,19 +614,20 @@ export class Engine extends EventEmitter {
 			if (e instanceof MissingSecretError) { this.missing.set(e.secret, true); this.redrawAll(); }
 			this.log(`action ${a.type} failed: ${(e as Error).message}`);
 			if (index >= 0) for (const k of this.keys.values()) if (k.index === index) void k.surface.showAlert();
-			void mac.notify((e as Error).message, "ContextDeck");
+			void this.os.notify((e as Error).message, "ContextDeck");
 		}
 	}
 
 	private async run(a: Action, index: number, owner: LayoutDef | null): Promise<void> {
 		const t = (s: string) => template(s, this.scope());
 		switch (a.type) {
-			case "keys": return mac.sendKeys(a.keys);
-			case "type": return void (await mac.typeText(t(a.text)));
-			case "shell": return mac.shell(t(a.cmd));
-			case "open": return void (await mac.open(t(a.target)));
-			case "applescript": return void (await mac.osascript(a.script, 30000));
-			case "copy": return void (await mac.setClipboard(t(a.text)));
+			case "keys": return this.os.sendKeys(a.keys);
+			case "type": return void (await this.os.typeText(t(a.text)));
+			case "shell": return this.os.shell(t(a.cmd));
+			case "open": return void (await this.os.open(t(a.target)));
+			case "applescript": return void (await this.os.runScript(a.script, "applescript", 30000));
+			case "script": return void (await this.os.runScript(a.script, a.lang, 30000));
+			case "copy": return void (await this.os.setClipboard(t(a.text)));
 			case "http": {
 				const raw = { url: t(a.url), headers: { "content-type": "application/json", ...a.headers }, body: a.body === undefined ? undefined : t(JSON.stringify(a.body)) };
 				const req = await withSecrets(raw, raw.url, this.declsFor(owner), this.deps.secrets);
@@ -640,9 +646,9 @@ export class Engine extends EventEmitter {
 				if (a.key.startsWith("__pick:")) {
 					const p = a.value as { index: number; value: string; mode: string };
 					const id = a.key.slice(7);
-					if (p.mode !== "return") await mac.setClipboard(p.value);
+					if (p.mode !== "return") await this.os.setClipboard(p.value);
 					this.closeOverlay({ picked: p.value, index: p.index });
-					if (p.mode === "paste") { await new Promise((r) => setTimeout(r, 80)); await mac.sendKeys("cmd+v"); }
+					if (p.mode === "paste") { await new Promise((r) => setTimeout(r, 80)); await this.os.sendKeys("mod+v"); }
 					else if (p.mode === "copy") this.flash(KEY_COUNT - 1, "#22C55E", "Copied", 900);
 					this.emit("pick", { id, ...p });
 					return;
@@ -661,7 +667,7 @@ export class Engine extends EventEmitter {
 			case "llmSelect": return this.selectLlm(a.provider);
 			case "menu": {
 				if (!this.ctx.bundleId) throw new Error("No app in front");
-				return void (await mac.osascript(menuClickScript(this.ctx.bundleId, a.path), 8000));
+				return void (await this.os.clickMenu(this.ctx.bundleId, a.path));
 			}
 			case "setup": {
 				const r = await this.runSetup({ force: a.force, update: a.update, index });
@@ -694,7 +700,7 @@ export class Engine extends EventEmitter {
 		if (!bundleId) return undefined;
 		const ignore = new Set([...SETUP_IGNORE, ...(this.settings.setupIgnore ?? [])]);
 		if (ignore.has(bundleId)) return undefined;
-		if (mac.BROWSERS.includes(bundleId) || bundleId === "org.mozilla.firefox") {
+		if (this.browsers.includes(bundleId)) {
 			if ((r.levels.sub && !r.levels.sub.generic) || !url || NON_WEB.test(url)) return undefined;
 			const t = targetForSite(bundleId, url);
 			return t && !ignore.has(t.host!) ? t : undefined;
@@ -863,7 +869,7 @@ export class Engine extends EventEmitter {
 			const nKeys = all.length, nDials = (layout.dials ?? []).filter(Boolean).length, nInfo = all.filter((k) => k.info).length;
 			const secretList = Object.keys(layout.secrets ?? {});
 			this.log(`setup ${tgt.id}: wrote ${file} (${nKeys} keys, ${nDials} dials, ${nInfo} info, secrets: ${secretList.join(", ") || "none"}${dropped.length ? `; dropped: ${dropped.join("; ")}` : ""})`);
-			void mac.notify(`${layout.name}: ${nKeys} keys${nInfo ? ` (${nInfo} live)` : ""}, ${nDials} dials · ${layout.generated?.source}${secretList.length ? ` · optional keys: ${secretList.join(", ")}` : ""}`, "ContextDeck set up");
+			void this.os.notify(`${layout.name}: ${nKeys} keys${nInfo ? ` (${nInfo} live)` : ""}, ${nDials} dials · ${layout.generated?.source}${secretList.length ? ` · optional keys: ${secretList.join(", ")}` : ""}`, "ContextDeck set up");
 			return { ok: true, layout: layout.id, name: layout.name, keys: nKeys, dials: nDials, info: nInfo, source: layout.generated?.source, secrets: secretList, dropped };
 		} catch (e) {
 			const error = (e as Error).message;
@@ -940,8 +946,8 @@ export class Engine extends EventEmitter {
 		if (index >= 0) { this.busy.set(index, `asking ${providerName(this.settings, provider)}`); this.drawKey(index); }
 		try {
 			let input = "";
-			if (inputMode === "selection") input = (await mac.copySelection()) || (await mac.getClipboard());
-			else if (inputMode === "clipboard") input = await mac.getClipboard();
+			if (inputMode === "selection") input = (await this.os.copySelection()) || (await this.os.getClipboard());
+			else if (inputMode === "clipboard") input = await this.os.getClipboard();
 			const out = a.output ?? "clipboard";
 			const prompt = template(a.prompt, this.scope()) + (out === "choices" ? "\n\nReturn up to 7 options, one per line, no numbering, each under 60 characters." : "");
 			let text: string;
@@ -956,13 +962,13 @@ export class Engine extends EventEmitter {
 			if (out === "choices") {
 				this.showOverlay({ title: "Pick one", items: parseChoices(text).map((label) => ({ label })), onPick: "copy" });
 			} else if (out === "paste") {
-				await mac.setClipboard(text);
-				await mac.sendKeys("cmd+v");
+				await this.os.setClipboard(text);
+				await this.os.sendKeys("mod+v");
 			} else if (out === "notify") {
-				await mac.setClipboard(text);
-				await mac.notify(text, providerName(this.settings, provider));
+				await this.os.setClipboard(text);
+				await this.os.notify(text, providerName(this.settings, provider));
 			} else {
-				await mac.setClipboard(text);
+				await this.os.setClipboard(text);
 				if (index >= 0) this.flash(index, "#22C55E", "Copied", 1200);
 			}
 		} finally {

@@ -7,7 +7,7 @@ import { deleteLayout, installDefaults, layoutFile, loadConfig, stripJsonComment
 import { Engine, type DialSurface, type KeySurface } from "../src/engine";
 import { colorFor, evaluate, extract, format, unsafeReason } from "../src/info";
 import { askLLM, configuredProviders, parseChoices, resolveProvider } from "../src/llm";
-import { chordToAppleScript, parseAppName, prettyBundle } from "../src/mac";
+import { chordToAppleScript, parseAppName, prettyBundle } from "../src/platform/mac";
 import { axToChord, menuClickScript, parseMenuDump, usefulEntries } from "../src/menus";
 import { loadIcons, renderDial, renderKey } from "../src/render";
 import { htmlToText, rankHits, type Digest } from "../src/research";
@@ -15,6 +15,11 @@ import { composeSmart, glob, inTime, levelOf, resolve, template, DEFAULT_ZONES }
 import { memoryStore, MissingSecretError, withSecrets } from "../src/secrets";
 import { buildPrompt, chordKey, planToLayout, targetForApp, targetForSite } from "../src/setup";
 import type { Action, Config, Context, LayoutDef } from "../src/types";
+import { setPlatform } from "../src/platform";
+import { macPlatform } from "../src/platform/mac";
+
+// The fixtures are macOS bundle ids; adapter-specific tests set their own platform.
+setPlatform(macPlatform);
 
 const DEFAULTS = "com.var.contextdeck.sdPlugin/defaults";
 const icons = loadIcons("com.var.contextdeck.sdPlugin/icons.json");

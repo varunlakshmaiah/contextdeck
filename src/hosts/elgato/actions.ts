@@ -4,7 +4,7 @@ import {
 } from "@elgato/streamdeck";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonObject = { [key: string]: any };
-import type { Engine } from "./engine";
+import type { Engine } from "../../engine";
 
 type S = JsonObject;
 

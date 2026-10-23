@@ -17,7 +17,7 @@ export const DEFAULTS_DIR = join(PLUGIN_DIR, "defaults");
 /** Folder for each level inside layouts/. */
 export const LEVEL_DIRS = { system: "system", app: "apps", sub: "sites", takeover: "takeovers" } as const;
 
-const ACTION_TYPES = new Set(["keys", "type", "shell", "open", "applescript", "http", "mode", "layout", "flag", "state", "overlay", "closeOverlay", "claude", "llm", "llmSelect", "copy", "sequence", "menu", "setup", "deckMenu", "reload", "editLayout", "page", "secretSet"]);
+const ACTION_TYPES = new Set(["keys", "type", "shell", "open", "applescript", "script", "http", "mode", "layout", "flag", "state", "overlay", "closeOverlay", "claude", "llm", "llmSelect", "copy", "sequence", "menu", "setup", "deckMenu", "reload", "editLayout", "page", "secretSet"]);
 
 function checkAction(a: Action | undefined, where: string, errors: string[]) {
 	if (!a) return;

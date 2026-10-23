@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { deleteLayout, writeLayout } from "./config";
 import { askLLM, configuredProviders, providerName, resolveProvider } from "./llm";
-import { scanMenus, usefulEntries } from "./menus";
+import { usefulEntries } from "./menus";
 import type { Engine } from "./engine";
 import type { LayoutDef, OverlaySpec } from "./types";
 
@@ -115,7 +115,7 @@ export function startApi(engine: Engine, port: number, token: string) {
 			if (route === "GET /menus") {
 				const bundleId = url.searchParams.get("bundleId") || engine.ctx.bundleId;
 				if (!bundleId) return send(res, 400, { error: "no app in front" });
-				const all = await scanMenus(bundleId);
+				const all = await engine.os.scanMenus(bundleId);
 				const entries = url.searchParams.get("all") ? all : usefulEntries(all, engine.ctx.app);
 				return send(res, 200, { bundleId, count: entries.length, withShortcuts: entries.filter((e) => e.chord).length, entries: entries.map((e) => ({ path: e.path.join(" > "), chord: e.chord ?? null })) });
 			}

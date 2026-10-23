@@ -9,9 +9,10 @@
  * Ids follow the naming convention: app.<bundleId> (level app) and site.<host> (level sub).
  */
 import { unsafeReason } from "./info";
-import { chordToAppleScript } from "./mac";
+import { validateKeys } from "./platform/chords";
 import type { MenuEntry } from "./menus";
-import type { Digest, Platform } from "./research";
+import type { Digest } from "./research";
+import type { PlatformFacts as Platform } from "./platform/types";
 import { SECRET_NAME, secretNames } from "./secrets";
 import type { Action, DialDef, InfoSpec, KeyDef, LayoutDef, Meta, SecretDecl } from "./types";
 
@@ -187,7 +188,7 @@ export function planToLayout(t: SetupTarget, plan: Plan, entries: MenuEntry[], i
 		}
 		if (r.keys) {
 			const chords = r.keys.trim().toLowerCase().replace(/option/g, "alt").replace(/command/g, "cmd").replace(/control/g, "ctrl").split(/\s+/);
-			try { chords.forEach(chordToAppleScript); } catch (e) { dropped.push(`${where}: ${(e as Error).message}`); return undefined; }
+			try { chords.forEach(validateKeys); } catch (e) { dropped.push(`${where}: ${(e as Error).message}`); return undefined; }
 			const k = chordKey(chords.join(" "));
 			const meta: Meta = menuChords.has(k) ? { confidence: "verified", source: "menu" }
 				: documented.has(k) ? { confidence: "documented", source: documented.get(k) ?? source }

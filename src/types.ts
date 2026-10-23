@@ -21,9 +21,10 @@ export type Level = "system" | "app" | "sub" | "takeover";
 export type Action =
 	| { type: "keys"; keys: string }                       // "cmd+shift+4", or a sequence separated by spaces: "cmd+c cmd+v"
 	| { type: "type"; text: string }                       // type literal text
-	| { type: "shell"; cmd: string }                       // runs in /bin/zsh -lc
+	| { type: "shell"; cmd: string }                       // login shell (zsh on macOS, $SHELL on Linux, cmd.exe on Windows)
 	| { type: "open"; target: string }                     // URL, file path, or app name
-	| { type: "applescript"; script: string }
+	| { type: "applescript"; script: string }               // macOS
+	| { type: "script"; script: string; lang?: "applescript" | "jxa" | "powershell" | "sh" }  // any OS (lang defaults per OS)
 	| { type: "http"; url: string; method?: string; headers?: Record<string, string>; body?: unknown }  // {{secret.X}} allowed (host-bound)
 	| { type: "mode"; mode: string; layout?: string }      // switch sub-mode of the key's layout (or the named one)
 	| { type: "layout"; id: string | null }                // pin a layout (null = back to automatic)
@@ -60,6 +61,7 @@ export type InfoSource =
 	| { type: "file"; path: string }                                                    // text or JSON file (~ allowed)
 	| { type: "state"; key: string }                                                    // value pushed via API / `deck state`
 	| { type: "applescript"; script: string }                                           // read-only `get` scripts
+	| { type: "script"; script: string; lang?: string }                                 // hand-written only (not auto-generated unless AppleScript)
 	| { type: "command"; cmd: string[] }                                                // allowlisted read-only binaries
 	| { type: "uiText"; app?: string; match: string };                                  // regex over the front window's visible text (Accessibility)
 
@@ -135,7 +137,8 @@ export interface PageDef extends ModeDef {
 /** How a sub-context is read for a native app (feeds ctx.sub, matched by match.sub). */
 export type Probe =
 	| { type: "windowTitle"; every?: number }
-	| { type: "applescript"; script: string; every?: number };
+	| { type: "applescript"; script: string; every?: number }
+	| { type: "script"; script: string; lang?: string; every?: number };
 
 export interface SecretDecl {
 	description?: string;
@@ -190,7 +193,8 @@ export interface Settings extends LlmSettings {
 	background?: string;
 	holdMs?: number;
 	apiPort?: number;
-	browsers?: string[];
+	browsers?: string[];                  // extra app ids to treat as browsers
+	cmdKey?: "ctrl" | "win";              // Windows/Linux: what "cmd" in layouts means (default ctrl; "mod" is always cmd on macOS, ctrl elsewhere)
 	autoSetup?: "key" | "auto" | "off";   // key = show a "Set up" key on unconfigured apps (default); auto = configure on first open
 	setupSlot?: number;                   // which key shows "Set up" (default 6)
 	setupIgnore?: string[];               // bundle IDs / hosts never offered setup

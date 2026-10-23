@@ -1,14 +1,15 @@
 /**
  * Secrets: API keys/tokens referenced as {{secret.NAME}} in http actions and info sources.
  *
- *  - Stored only in the macOS Keychain (service "contextdeck", account NAME). Never in layout files.
+ *  - Stored only in the OS credential store (macOS Keychain / Windows Credential Manager / libsecret),
+ *    service "contextdeck", account NAME. Never in layout files.
  *  - NAME is UPPER_SNAKE: <SERVICE>_<KIND>, KIND ∈ API_KEY | TOKEN | URL | SECRET.
  *  - A secret is only substituted into a request whose host matches its declared `hosts`,
  *    so a layout (or a model that wrote it) can't send your key somewhere else.
  *  - hosts may include "secret:OTHER_NAME" = the host of another stored URL secret (e.g. a self-hosted server).
  *  - <PROVIDER>_API_KEY falls back to the LLM provider's key (e.g. OPENROUTER_API_KEY → "openrouter").
  */
-import { keychainSecret, run } from "./mac";
+import { platform } from "./platform";
 import { glob } from "./resolve";
 import type { SecretDecl } from "./types";
 
@@ -21,26 +22,25 @@ export interface SecretStore {
 	forget?(name?: string): void;
 }
 
-/** Keychain-backed store with a short cache (keychain reads cost ~30–60 ms). */
-export function keychainStore(ttlMs = 60_000): SecretStore & { forget(name?: string): void } {
+/** OS credential store with a short cache (keychain reads cost ~30–60 ms). */
+export function keychainStore(ttlMs = 60_000): SecretStore & { forget(name?: string): void; remove(name: string): Promise<void> } {
 	const cache = new Map<string, { v: string | undefined; at: number }>();
 	return {
 		async get(name) {
 			const hit = cache.get(name);
 			if (hit && Date.now() - hit.at < (hit.v ? ttlMs : 10_000)) return hit.v;
-			let v = await keychainSecret("contextdeck", name);
+			let v = await platform().secretGet(name);
 			const alias = /^([A-Z0-9]+)_API_KEY$/.exec(name);
-			if (!v && alias) v = await keychainSecret("contextdeck", alias[1].toLowerCase());
+			if (!v && alias) v = await platform().secretGet(alias[1].toLowerCase());
 			cache.set(name, { v, at: Date.now() });
 			return v;
 		},
 		async set(name, value) {
 			if (!SECRET_NAME.test(name)) throw new Error(`Secret names are UPPER_SNAKE_CASE (got "${name}")`);
-			// `security -i` reads the command from stdin, so the value never appears in the process list.
-			const q = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-			await run("/usr/bin/security", ["-i"], { input: `add-generic-password -U -s contextdeck -a ${q(name)} -w ${q(value)}\n`, timeout: 8000 });
+			await platform().secretSet(name, value);
 			cache.delete(name);
 		},
+		async remove(name: string) { await platform().secretDelete(name); cache.delete(name); },
 		forget(name) { if (name) cache.delete(name); else cache.clear(); },
 	};
 }

@@ -1,11 +1,11 @@
 import streamDeck from "@elgato/streamdeck";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { scanMenus } from "./menus";
+import { platform } from "../../platform";
 import { join } from "node:path";
 import { ContextDial, ContextKey } from "./actions";
-import { startApi } from "./api";
-import { CONFIG_PATH, HOME_DIR, ensureHome, loadConfig, readToken, watchConfig } from "./config";
-import { Engine } from "./engine";
+import { startApi } from "../../api";
+import { CONFIG_PATH, HOME_DIR, ensureHome, loadConfig, readToken, watchConfig } from "../../config";
+import { Engine } from "../../engine";
 
 const VERSION = "0.4.0";
 const log = streamDeck.logger.createScope("ContextDeck");
@@ -45,7 +45,7 @@ const SETUP_STATE = join(HOME_DIR, "setup-state.json");
 try { engine.setupState = JSON.parse(readFileSync(SETUP_STATE, "utf8")); } catch { /* first run */ }
 // Keep the last menu scan per app in ~/.contextdeck/menus/ (handy for hand-editing layouts, and for Claude via MCP).
 engine.deps.scanMenus = async (bundleId) => {
-	const entries = await scanMenus(bundleId);
+	const entries = await platform().scanMenus(bundleId);
 	try {
 		mkdirSync(join(HOME_DIR, "menus"), { recursive: true });
 		writeFileSync(join(HOME_DIR, "menus", `${bundleId}.txt`), entries.map((e) => `${e.path.join(" > ")}${e.chord ? `\t[${e.chord}]` : ""}`).join("\n"));

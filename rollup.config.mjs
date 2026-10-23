@@ -11,7 +11,7 @@ const modulePkg = { name: "emit-module-package-file", generateBundle() { this.em
 
 export default [
 	{
-		input: "src/plugin.ts",
+		input: "src/hosts/elgato/plugin.ts",
 		output: { file: `${sdPlugin}/bin/plugin.js`, sourcemap: isWatching },
 		plugins: [
 			{ name: "watch-externals", buildStart() { this.addWatchFile(`${sdPlugin}/manifest.json`); } },

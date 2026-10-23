@@ -5,7 +5,8 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { normalize } from "node:path";
-import { osascript, run } from "./mac";
+import { platform } from "./platform";
+import { run } from "./platform/run";
 import { withSecrets, type SecretStore } from "./secrets";
 import type { InfoSource, InfoSpec, SecretDecl } from "./types";
 
@@ -20,11 +21,6 @@ export interface InfoContext {
 
 // ---------- safety: what auto-generated layouts may use without review ----------
 
-const COMMANDS: Record<string, string[] | "any"> = {
-	"/usr/bin/pmset": ["-g"], "/bin/date": "any", "/bin/df": "any", "/usr/bin/uptime": "any", "/usr/bin/sw_vers": "any",
-	"/usr/sbin/sysctl": ["-n"], "/usr/bin/defaults": ["read"], "/usr/sbin/ioreg": "any", "/usr/sbin/networksetup": ["-getairportnetwork", "-getinfo"],
-	gh: ["api", "pr", "issue", "run", "status"], git: ["status", "log", "rev-parse", "branch", "-C"],
-};
 const UNSAFE_AS = /\b(do shell script|set |delete|click|keystroke|key code|make |move |duplicate|quit|open |close |save|empty|restart|shut down|log out|run script|load script|store script|write|activate)\b/i;
 
 /** Read-only check for sources proposed by a model. Returns a reason when unsafe. */
@@ -38,13 +34,23 @@ export function unsafeReason(src: InfoSource): string | undefined {
 			return p.startsWith(homedir()) && !p.includes("/.ssh") && !/Keychains|\.contextdeck\/token/.test(p) ? undefined : "file must be inside your home folder (no keys/keychains)";
 		}
 		case "applescript": return UNSAFE_AS.test(src.script) ? "AppleScript may only read (get) values" : undefined;
+		case "script": return (src.lang ?? "applescript") === "applescript" ? (UNSAFE_AS.test(src.script) ? "AppleScript may only read (get) values" : undefined) : `${src.lang} scripts can't be checked as read-only; use a "command" source`;
 		case "command": {
-			const allowed = COMMANDS[src.cmd[0]];
+			const allowed = platform().commandAllowlist[src.cmd[0]];
 			if (!allowed) return `command ${src.cmd[0]} isn't on the read-only list`;
 			if (allowed !== "any" && !allowed.includes(src.cmd[1] ?? "")) return `${src.cmd[0]} ${src.cmd[1] ?? ""} isn't allowed`;
 			return undefined;
 		}
 	}
+}
+
+/** Absolute paths run directly; bare names (gh, git) go through the login shell so PATH from your profile applies. */
+async function runCommand(cmd: string[]): Promise<string> {
+	const abs = /^([a-z]:\\|\/)/i.test(cmd[0]);
+	if (abs) return run(cmd[0], cmd.slice(1), { timeout: 10_000 });
+	if (process.platform === "win32") return run(cmd[0], cmd.slice(1), { timeout: 10_000 });
+	const sh = process.platform === "darwin" ? "/bin/zsh" : process.env.SHELL || "/bin/sh";
+	return run(sh, ["-lc", cmd.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")], { timeout: 10_000 });
 }
 
 // ---------- fetching ----------
@@ -60,17 +66,15 @@ export async function fetchSource(src: InfoSource, ic: InfoContext): Promise<unk
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			return parseMaybeJson(body);
 		}
-		case "applescript": return parseMaybeJson(await osascript(src.script, 8000));
+		case "applescript": return parseMaybeJson(await platform().runScript(src.script, "applescript", 8000));
+		case "script": return parseMaybeJson(await platform().runScript(src.script, src.lang, 8000));
 		case "command": {
 			const reason = unsafeReason(src);
 			if (reason) throw new Error(reason);
-			const bin = src.cmd[0].startsWith("/") ? src.cmd[0] : "/bin/zsh";
-			const args = src.cmd[0].startsWith("/") ? src.cmd.slice(1) : ["-lc", src.cmd.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")];
-			return parseMaybeJson((await run(bin, args, { timeout: 10_000 })).trim());
+			return parseMaybeJson((await runCommand(src.cmd)).trim());
 		}
 		case "uiText": {
-			const target = src.app ? `(first application process whose bundle identifier is "${src.app.replace(/"/g, "")}")` : "(first application process whose frontmost is true)";
-			const text = await osascript(`tell application "System Events" to tell ${target}\nset AppleScript's text item delimiters to linefeed\nreturn (value of every static text of entire contents of front window) as text\nend tell`, 15_000);
+			const text = await platform().readWindowText(src.app);
 			const m = new RegExp(src.match, "i").exec(text);
 			if (!m) throw new Error("text not on screen");
 			return m[1] ?? m[0];

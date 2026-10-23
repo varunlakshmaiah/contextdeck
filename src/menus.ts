@@ -1,8 +1,8 @@
 /**
- * Reads the menu bar of a running app (names + real keyboard shortcuts) through System Events,
- * and clicks menu items by path. Uses the Accessibility permission Stream Deck already needs for keystrokes.
+ * Menu bar data model + parsers shared by the platform adapters
+ * (macOS: Accessibility via System Events; Windows: UI Automation accelerator text).
  */
-import { KEY_CODES, run } from "./mac";
+import { MAC_KEY_CODES as KEY_CODES } from "./platform/mac-keys";
 
 export interface MenuEntry {
 	path: string[];       // ["View", "Zoom In"]
@@ -10,91 +10,7 @@ export interface MenuEntry {
 	enabled?: boolean;
 }
 
-const SEP = "\u001e";
-
-/** AppleScript: dumps every menu (top level + `maxDepth`-1 submenu levels) as tab-separated lines. */
-export const MENU_SCAN_SCRIPT = `
-on run argv
-	set bid to item 1 of argv
-	set maxDepth to (item 2 of argv) as integer
-	set out to {}
-	tell application "System Events"
-		set procs to (application processes whose bundle identifier is bid)
-		if (count of procs) is 0 then error "Process not running: " & bid
-		set p to item 1 of procs
-		set mb to menu bar 1 of p
-		set tops to name of menu bar items of mb
-	end tell
-	repeat with i from 2 to count of tops
-		set tName to item i of tops
-		if tName is not missing value then
-			try
-				tell application "System Events" to set m to menu 1 of menu bar item i of mb
-				my dumpMenu(m, tName, out, 1, maxDepth)
-			end try
-		end if
-	end repeat
-	set AppleScript's text item delimiters to linefeed
-	return out as text
-end run
-
-on fmt(v)
-	if v is missing value then return ""
-	try
-		return v as text
-	on error
-		return ""
-	end try
-end fmt
-
-on dumpMenu(m, prefix, out, depth, maxDepth)
-	tell application "System Events"
-		set nms to name of menu items of m
-		try
-			set chs to value of attribute "AXMenuItemCmdChar" of menu items of m
-			set mds to value of attribute "AXMenuItemCmdModifiers" of menu items of m
-			set vks to value of attribute "AXMenuItemCmdVirtualKey" of menu items of m
-			set ens to enabled of menu items of m
-		on error
-			set chs to {}
-			set mds to {}
-			set vks to {}
-			set ens to {}
-			repeat with j from 1 to count of nms
-				try
-					set end of chs to value of attribute "AXMenuItemCmdChar" of menu item j of m
-				on error
-					set end of chs to missing value
-				end try
-				try
-					set end of mds to value of attribute "AXMenuItemCmdModifiers" of menu item j of m
-				on error
-					set end of mds to missing value
-				end try
-				try
-					set end of vks to value of attribute "AXMenuItemCmdVirtualKey" of menu item j of m
-				on error
-					set end of vks to missing value
-				end try
-				set end of ens to true
-			end repeat
-		end try
-	end tell
-	repeat with j from 1 to count of nms
-		set nm to item j of nms
-		if nm is not missing value and nm is not "" then
-			set c to my fmt(item j of chs)
-			set end of out to prefix & tab & nm & tab & c & tab & my fmt(item j of mds) & tab & my fmt(item j of vks) & tab & my fmt(item j of ens)
-			if c is "" and depth < maxDepth then
-				try
-					tell application "System Events" to set sm to menu 1 of menu item j of m
-					my dumpMenu(sm, prefix & (character id 30) & nm, out, depth + 1, maxDepth)
-				end try
-			end if
-		end if
-	end repeat
-end dumpMenu
-`;
+export const SEP = "\u001e";
 
 const SPECIAL: Record<string, string> = {
 	"": "up", "": "down", "": "left", "": "right",
@@ -148,11 +64,6 @@ export function parseMenuDump(text: string): MenuEntry[] {
 	return out;
 }
 
-export async function scanMenus(bundleId: string, maxDepth = 2): Promise<MenuEntry[]> {
-	const out = await run("/usr/bin/osascript", ["-e", MENU_SCAN_SCRIPT, bundleId, String(maxDepth)], { timeout: 90_000 });
-	return parseMenuDump(out);
-}
-
 const q = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
 /** AppleScript that clicks a menu item by path in the given app. */
@@ -176,4 +87,38 @@ export function usefulEntries(entries: MenuEntry[], app: string): MenuEntry[] {
 		if (/^\d+$/.test(last) || last.length > 60) return false;
 		return true;
 	});
+}
+
+/** Windows/Linux accelerator text ("Ctrl+Shift+N", "Alt+F4", "Ctrl+=") → ContextDeck chord ("ctrl+shift+n"). */
+export function acceleratorToChord(text: string): string | undefined {
+	const t = text.trim();
+	if (!t) return undefined;
+	const parts = t.split("+").map((p) => p.trim().toLowerCase());
+	if (t.endsWith("++")) { parts.splice(-2, 2, "="); parts.unshift("shift"); }
+	const key = parts.pop() ?? "";
+	const MOD: Record<string, string> = { ctrl: "ctrl", control: "ctrl", strg: "ctrl", shift: "shift", umschalt: "shift", alt: "alt", win: "win", windows: "win", super: "win", cmd: "cmd" };
+	const mods: string[] = [];
+	for (const p of parts) { const m = MOD[p]; if (!m) return undefined; mods.push(m); }
+	const NAMES: Record<string, string> = { del: "fwddelete", delete: "fwddelete", ins: "kcins", enter: "return", esc: "esc", escape: "esc", tab: "tab", space: "space", backspace: "delete", bksp: "delete",
+		left: "left", right: "right", up: "up", down: "down", home: "home", end: "end", pgup: "pageup", pageup: "pageup", pgdn: "pagedown", pagedown: "pagedown", plus: "=", minus: "-", "num +": "=", "num -": "-" };
+	let k = NAMES[key] ?? key;
+	if (k === "kcins") return undefined;
+	if (/^f([1-9]|1[0-9])$/.test(k) || /^[a-z0-9]$/.test(k) || ["[", "]", "=", "-", ",", ".", "/", ";", "'", "\\", "`"].includes(k) || ["return", "tab", "space", "delete", "fwddelete", "esc", "left", "right", "up", "down", "home", "end", "pageup", "pagedown"].includes(k)) {
+		if (!mods.length && /^[a-z0-9]$/.test(k)) return undefined;
+		return [...mods, k].join("+");
+	}
+	return undefined;
+}
+
+/** Generic dump format used by non-mac adapters: path parts joined by SEP, then TAB, then accelerator text. */
+export function parseAcceleratorDump(text: string): MenuEntry[] {
+	const out: MenuEntry[] = [];
+	for (const line of text.split(/\r?\n/)) {
+		if (!line.trim()) continue;
+		const [p, accel = "", enabled = ""] = line.split("\t");
+		const path = p.split(SEP).map((x) => x.replace(/&(?=\w)/g, "").trim()).filter(Boolean);
+		if (path.length < 2) continue;
+		out.push({ path, chord: acceleratorToChord(accel), enabled: enabled !== "false" });
+	}
+	return out;
 }

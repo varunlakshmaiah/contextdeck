@@ -6,7 +6,7 @@
  * Providers are named in settings.providers and merged over the presets below, so {"openrouter": {"model": "…"}} is enough.
  * API keys live in the macOS Keychain:  security add-generic-password -s contextdeck -a <provider name> -w "KEY"
  */
-import { keychainSecret } from "./mac";
+import { platform } from "./platform";
 
 export interface ProviderDef {
 	type?: "anthropic" | "openai";
@@ -68,11 +68,11 @@ export const providerName = (s: LlmSettings, id: string) => resolveProvider(s, i
 async function apiKey(p: Resolved): Promise<string | undefined> {
 	if (p.def.noKey) return undefined;
 	const account = p.def.keychain ?? p.id;
-	const fromKeychain = await keychainSecret("contextdeck", account);
+	const fromKeychain = await platform().secretGet(account);
 	if (fromKeychain) return fromKeychain;
 	const env = p.def.apiKeyEnv ?? `${p.id.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`;
 	if (process.env[env]) return process.env[env];
-	throw new Error(`No API key for ${p.def.name ?? p.id}. Run: security add-generic-password -s contextdeck -a ${account} -w YOUR_KEY`);
+	throw new Error(`No API key for ${p.def.name ?? p.id}. Run: ~/.contextdeck/deck secret set ${account}  (or set ${env})`);
 }
 
 export interface AskOptions {
