@@ -1,0 +1,197 @@
+{
+	"id": "app.terminals",
+	"name": "Terminal",
+	"color": "#38BDF8",
+	"match": {
+		"bundleId": [
+			"com.apple.Terminal",
+			"com.googlecode.iterm2",
+			"com.mitchellh.ghostty",
+			"dev.warp.Warp-Stable"
+		]
+	},
+	"keys": [
+		{
+			"label": "Approve",
+			"sub": "agent prompt",
+			"icon": "check",
+			"color": "#22C55E",
+			"action": {
+				"type": "keys",
+				"keys": "return"
+			}
+		},
+		{
+			"label": "Deny",
+			"icon": "ban",
+			"color": "#EF4444",
+			"action": {
+				"type": "keys",
+				"keys": "esc"
+			}
+		},
+		{
+			"label": "Interrupt",
+			"sub": "ctrl+C",
+			"icon": "octagon-x",
+			"color": "#F87171",
+			"action": {
+				"type": "keys",
+				"keys": "ctrl+c"
+			}
+		},
+		{
+			"label": "Clear",
+			"icon": "eraser",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+k"
+			}
+		},
+		{
+			"label": "Agent",
+			"sub": "{{state.agent.status}}",
+			"stateKey": "agent.status",
+			"stateColors": {
+				"running": "#FBBF24",
+				"waiting": "#F97316",
+				"done": "#22C55E",
+				"error": "#EF4444"
+			}
+		},
+		{
+			"label": "Explain err",
+			"icon": "lightbulb",
+			"color": "#D97757",
+			"action": {
+				"type": "llm",
+				"input": "selection",
+				"output": "notify",
+				"prompt": "Explain this terminal error and give the single most likely fix command."
+			}
+		},
+		{
+			"label": "New tab",
+			"icon": "plus",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+t"
+			}
+		}
+	],
+	"dials": [
+		{
+			"label": "Tabs",
+			"icon": "panels-top-left",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+shift+]"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+shift+["
+			}
+		},
+		{
+			"label": "History",
+			"icon": "history",
+			"cw": {
+				"type": "keys",
+				"keys": "down"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "up"
+			},
+			"press": {
+				"type": "keys",
+				"keys": "return"
+			}
+		},
+		{
+			"label": "Font",
+			"icon": "a-large-small",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+="
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+-"
+			}
+		}
+	],
+	"level": "app",
+	"pages": [
+		{
+			"name": "GitHub",
+			"keys": [
+				{
+					"label": "GitHub",
+					"icon": "bell",
+					"requires": [
+						"GITHUB_TOKEN"
+					],
+					"info": {
+						"source": {
+							"type": "http",
+							"url": "https://api.github.com/notifications",
+							"headers": {
+								"Authorization": "Bearer {{secret.GITHUB_TOKEN}}",
+								"Accept": "application/vnd.github+json"
+							}
+						},
+						"extract": "length",
+						"format": "{{value}}",
+						"every": 120,
+						"thresholds": [
+							{
+								"above": 0,
+								"color": "#38BDF8"
+							}
+						]
+					},
+					"sub": "notifications"
+				},
+				{
+					"label": "My PRs",
+					"icon": "git-pull-request",
+					"requires": [
+						"GITHUB_TOKEN"
+					],
+					"info": {
+						"source": {
+							"type": "http",
+							"url": "https://api.github.com/search/issues?q=is:open+is:pr+author:@me",
+							"headers": {
+								"Authorization": "Bearer {{secret.GITHUB_TOKEN}}",
+								"Accept": "application/vnd.github+json"
+							}
+						},
+						"extract": "total_count",
+						"format": "{{value}}",
+						"every": 300
+					},
+					"sub": "open"
+				},
+				{
+					"label": "Open PRs",
+					"icon": "external-link",
+					"action": {
+						"type": "open",
+						"target": "https://github.com/pulls"
+					}
+				}
+			]
+		}
+	],
+	"secrets": {
+		"GITHUB_TOKEN": {
+			"description": "GitHub fine-grained token (read-only: notifications, pull requests)",
+			"url": "https://github.com/settings/tokens",
+			"hosts": [
+				"api.github.com"
+			]
+		}
+	}
+}

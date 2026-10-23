@@ -1,0 +1,318 @@
+{
+	"id": "app.davinci-resolve",
+	"name": "Resolve",
+	"color": "#EF4444",
+	"match": {
+		"bundleId": "com.blackmagic-design.DaVinciResolve*"
+	},
+	"defaultMode": "edit",
+	"modes": {
+		"edit": {
+			"keys": [
+				{
+					"label": "Blade",
+					"sub": "B",
+					"icon": "scissors",
+					"action": {
+						"type": "keys",
+						"keys": "b"
+					}
+				},
+				{
+					"label": "Select",
+					"sub": "A",
+					"icon": "mouse-pointer-2",
+					"action": {
+						"type": "keys",
+						"keys": "a"
+					}
+				},
+				{
+					"label": "Razor",
+					"sub": "at playhead",
+					"icon": "split",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+b"
+					}
+				},
+				{
+					"label": "Ripple Del",
+					"icon": "trash-2",
+					"color": "#F87171",
+					"action": {
+						"type": "keys",
+						"keys": "shift+delete"
+					}
+				},
+				{
+					"label": "Marker",
+					"sub": "M",
+					"icon": "bookmark",
+					"action": {
+						"type": "keys",
+						"keys": "m"
+					}
+				},
+				{
+					"label": "Snapping",
+					"sub": "N",
+					"icon": "magnet",
+					"action": {
+						"type": "keys",
+						"keys": "n"
+					}
+				},
+				{
+					"label": "Color ▸",
+					"icon": "palette",
+					"color": "#A78BFA",
+					"action": {
+						"type": "sequence",
+						"steps": [
+							{
+								"type": "keys",
+								"keys": "shift+6"
+							},
+							{
+								"type": "mode",
+								"mode": "color"
+							}
+						]
+					}
+				}
+			],
+			"dials": [
+				{
+					"label": "Frames",
+					"icon": "move-horizontal",
+					"cw": {
+						"type": "keys",
+						"keys": "right"
+					},
+					"ccw": {
+						"type": "keys",
+						"keys": "left"
+					},
+					"press": {
+						"type": "keys",
+						"keys": "space"
+					}
+				},
+				{
+					"label": "Edits",
+					"icon": "skip-forward",
+					"cw": {
+						"type": "keys",
+						"keys": "down"
+					},
+					"ccw": {
+						"type": "keys",
+						"keys": "up"
+					}
+				},
+				{
+					"label": "Zoom",
+					"icon": "zoom-in",
+					"cw": {
+						"type": "keys",
+						"keys": "cmd+="
+					},
+					"ccw": {
+						"type": "keys",
+						"keys": "cmd+-"
+					},
+					"press": {
+						"type": "keys",
+						"keys": "shift+z"
+					}
+				}
+			]
+		},
+		"color": {
+			"keys": [
+				{
+					"label": "Grab Still",
+					"icon": "camera",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+alt+g"
+					}
+				},
+				{
+					"label": "Serial Node",
+					"icon": "git-commit-horizontal",
+					"action": {
+						"type": "keys",
+						"keys": "alt+s"
+					}
+				},
+				{
+					"label": "Node On/Off",
+					"icon": "power",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+d"
+					}
+				},
+				{
+					"label": "Bypass All",
+					"icon": "eye-off",
+					"action": {
+						"type": "keys",
+						"keys": "shift+d"
+					}
+				},
+				{
+					"label": "Deliver",
+					"icon": "rocket",
+					"action": {
+						"type": "sequence",
+						"steps": [
+							{
+								"type": "keys",
+								"keys": "shift+8"
+							},
+							{
+								"type": "mode",
+								"mode": "deliver"
+							}
+						]
+					}
+				},
+				{
+					"label": "Undo",
+					"icon": "undo-2",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+z"
+					}
+				},
+				{
+					"label": "◂ Edit",
+					"icon": "film",
+					"color": "#EF4444",
+					"action": {
+						"type": "sequence",
+						"steps": [
+							{
+								"type": "keys",
+								"keys": "shift+4"
+							},
+							{
+								"type": "mode",
+								"mode": "edit"
+							}
+						]
+					}
+				}
+			],
+			"dials": [
+				{
+					"label": "Clips",
+					"icon": "gallery-horizontal",
+					"cw": {
+						"type": "keys",
+						"keys": "down"
+					},
+					"ccw": {
+						"type": "keys",
+						"keys": "up"
+					}
+				},
+				{
+					"label": "Frames",
+					"icon": "move-horizontal",
+					"cw": {
+						"type": "keys",
+						"keys": "right"
+					},
+					"ccw": {
+						"type": "keys",
+						"keys": "left"
+					},
+					"press": {
+						"type": "keys",
+						"keys": "space"
+					}
+				},
+				{
+					"label": "Zoom",
+					"icon": "zoom-in",
+					"cw": {
+						"type": "keys",
+						"keys": "cmd+="
+					},
+					"ccw": {
+						"type": "keys",
+						"keys": "cmd+-"
+					}
+				}
+			]
+		},
+		"deliver": {
+			"keys": [
+				{
+					"label": "Chapters",
+					"sub": "from markers",
+					"icon": "list-ordered",
+					"action": {
+						"type": "llm",
+						"input": "clipboard",
+						"output": "clipboard",
+						"prompt": "These are timeline markers or a transcript with timecodes. Write YouTube chapters: first line 00:00, format 'MM:SS Title', 4-10 chapters, short punchy titles. Return only the chapters."
+					}
+				},
+				{
+					"label": "Titles",
+					"icon": "type",
+					"action": {
+						"type": "llm",
+						"input": "clipboard",
+						"output": "choices",
+						"prompt": "Write 7 YouTube titles for this video (script or summary in the input). Mix curiosity, clarity and specificity. Under 60 characters each."
+					}
+				},
+				{
+					"label": "Description",
+					"icon": "align-left",
+					"action": {
+						"type": "llm",
+						"input": "clipboard",
+						"output": "clipboard",
+						"prompt": "Write a YouTube description for this video: a 2-sentence hook, a short paragraph, then 3-5 relevant hashtags."
+					}
+				},
+				null,
+				null,
+				{
+					"label": "Undo",
+					"icon": "undo-2",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+z"
+					}
+				},
+				{
+					"label": "◂ Edit",
+					"icon": "film",
+					"color": "#EF4444",
+					"action": {
+						"type": "sequence",
+						"steps": [
+							{
+								"type": "keys",
+								"keys": "shift+4"
+							},
+							{
+								"type": "mode",
+								"mode": "edit"
+							}
+						]
+					}
+				}
+			]
+		}
+	},
+	"level": "app"
+}

@@ -1,0 +1,72 @@
+{
+	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+	"Name": "ContextDeck",
+	"Version": "0.4.0.0",
+	"Author": "Var",
+	"Description": "Keys and dials that redraw for whatever you're doing — app, website, mode, or anything you push in. Driven by ~/.contextdeck/layouts.json, with a local API and an MCP bridge for Claude.",
+	"UUID": "com.var.contextdeck",
+	"Category": "ContextDeck",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"Icon": "imgs/plugin/marketplace",
+	"CodePath": "bin/plugin.js",
+	"SDKVersion": 3,
+	"Software": {
+		"MinimumVersion": "7.1"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "12"
+		}
+	],
+	"Nodejs": {
+		"Version": "24",
+		"Debug": "disabled"
+	},
+	"Actions": [
+		{
+			"Name": "Context Key",
+			"UUID": "com.var.contextdeck.key",
+			"Icon": "imgs/actions/key/icon",
+			"Tooltip": "Put one on every key. It redraws itself for the current app or mode.",
+			"Controllers": [
+				"Keypad"
+			],
+			"UserTitleEnabled": false,
+			"DisableAutomaticStates": true,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/key/key",
+					"ShowTitle": false
+				}
+			]
+		},
+		{
+			"Name": "Context Dial",
+			"UUID": "com.var.contextdeck.dial",
+			"Icon": "imgs/actions/dial/icon",
+			"Tooltip": "Put one on each dial. It redraws its dial and touch strip for the current app or mode.",
+			"Controllers": [
+				"Encoder"
+			],
+			"UserTitleEnabled": false,
+			"SupportedInMultiActions": false,
+			"States": [
+				{
+					"Image": "imgs/actions/dial/key",
+					"ShowTitle": false
+				}
+			],
+			"Encoder": {
+				"Icon": "imgs/actions/dial/key",
+				"layout": "layouts/canvas.json",
+				"TriggerDescription": {
+					"Rotate": "Context",
+					"Push": "Context",
+					"Touch": "Context"
+				}
+			}
+		}
+	]
+}

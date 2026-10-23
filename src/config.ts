@@ -1,0 +1,201 @@
+import { randomBytes } from "node:crypto";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { levelOf } from "./resolve";
+import type { Action, Config, LayoutDef } from "./types";
+
+export const HOME_DIR = process.env.CONTEXTDECK_HOME ?? join(homedir(), ".contextdeck");
+/** config.json holds settings (+ optional inline layouts); layouts.json is the pre-0.4 name, still read. */
+export const CONFIG_PATH = existsSync(join(HOME_DIR, "config.json")) || !existsSync(join(HOME_DIR, "layouts.json")) ? join(HOME_DIR, "config.json") : join(HOME_DIR, "layouts.json");
+export const TOKEN_PATH = join(HOME_DIR, "token");
+export const LAYOUTS_DIR = join(HOME_DIR, "layouts");
+const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+export const DEFAULTS_DIR = join(PLUGIN_DIR, "defaults");
+
+/** Folder for each level inside layouts/. */
+export const LEVEL_DIRS = { system: "system", app: "apps", sub: "sites", takeover: "takeovers" } as const;
+
+const ACTION_TYPES = new Set(["keys", "type", "shell", "open", "applescript", "http", "mode", "layout", "flag", "state", "overlay", "closeOverlay", "claude", "llm", "llmSelect", "copy", "sequence", "menu", "setup", "deckMenu", "reload", "editLayout", "page", "secretSet"]);
+
+function checkAction(a: Action | undefined, where: string, errors: string[]) {
+	if (!a) return;
+	if (!ACTION_TYPES.has(a.type)) errors.push(`${where}: unknown action type "${(a as { type: string }).type}"`);
+	if (a.type === "sequence") a.steps?.forEach((s, i) => checkAction(s, `${where}.steps[${i}]`, errors));
+}
+
+/** Returns a list of human-readable problems; empty list = valid. */
+export function validate(cfg: unknown): string[] {
+	const errors: string[] = [];
+	const c = cfg as Config;
+	if (!c || typeof c !== "object" || !Array.isArray(c.layouts)) return ["Config must be an object with a \"layouts\" array"];
+	const ids = new Set<string>();
+	c.layouts.forEach((l, i) => {
+		const w = `layouts[${i}]${l?.id ? ` (${l.id})` : ""}`;
+		if (!l?.id) errors.push(`${w}: missing "id"`);
+		else if (ids.has(l.id)) errors.push(`${w}: duplicate id`);
+		else ids.add(l.id);
+		const groups = [{ keys: l.keys, dials: l.dials, w }, ...Object.entries(l.modes ?? {}).map(([m, d]) => ({ ...d, w: `${w}.modes.${m}` }))];
+		for (const g of groups) {
+			if (g.keys && g.keys.length > 8) errors.push(`${g.w}: more than 8 keys`);
+			if (g.dials && g.dials.length > 4) errors.push(`${g.w}: more than 4 dials`);
+			g.keys?.forEach((k, j) => { checkAction(k?.action, `${g.w}.keys[${j}].action`, errors); checkAction(k?.release, `${g.w}.keys[${j}].release`, errors); checkAction(k?.hold, `${g.w}.keys[${j}].hold`, errors); });
+			g.dials?.forEach((d, j) => {
+				if (!d) return;
+				checkAction(d.press, `${g.w}.dials[${j}].press`, errors);
+				checkAction(d.touch, `${g.w}.dials[${j}].touch`, errors);
+				if (d.kind === undefined || d.kind === "actions") { checkAction(d.cw, `${g.w}.dials[${j}].cw`, errors); checkAction(d.ccw, `${g.w}.dials[${j}].ccw`, errors); }
+				if (d.kind === "value" && !d.key) errors.push(`${g.w}.dials[${j}]: value dial needs "key"`);
+			});
+		}
+		if (l.defaultMode && !l.modes?.[l.defaultMode]) errors.push(`${w}: defaultMode "${l.defaultMode}" not in modes`);
+	});
+	return errors;
+}
+
+export function ensureHome(): void {
+	mkdirSync(LAYOUTS_DIR, { recursive: true });
+	if (!existsSync(join(HOME_DIR, "config.json")) && !existsSync(join(HOME_DIR, "layouts.json")) && existsSync(DEFAULTS_DIR)) installDefaults(DEFAULTS_DIR, HOME_DIR);
+	if (!existsSync(TOKEN_PATH)) writeFileSync(TOKEN_PATH, randomBytes(24).toString("hex"), { mode: 0o600 });
+	const cli = join(PLUGIN_DIR, "scripts", "deck.sh");
+	if (existsSync(cli)) { copyFileSync(cli, join(HOME_DIR, "deck")); chmodSync(join(HOME_DIR, "deck"), 0o755); }
+}
+
+/** First run: defaults/config.json → ~/.contextdeck/config.json, defaults/layouts/** → ~/.contextdeck/layouts/**. */
+export function installDefaults(defaultsDir: string, homeDir: string): void {
+	mkdirSync(homeDir, { recursive: true });
+	if (existsSync(join(defaultsDir, "config.json"))) copyFileSync(join(defaultsDir, "config.json"), join(homeDir, "config.json"));
+	if (existsSync(join(defaultsDir, "layouts"))) cpSync(join(defaultsDir, "layouts"), join(homeDir, "layouts"), { recursive: true, force: false, errorOnExist: false });
+}
+
+export const readToken = () => readFileSync(TOKEN_PATH, "utf8").trim();
+
+/** Strips // and /* *\/ comments so the config can be annotated. */
+export function stripJsonComments(src: string): string {
+	let out = "", inStr = false, i = 0;
+	while (i < src.length) {
+		const c = src[i], n = src[i + 1];
+		if (inStr) {
+			out += c;
+			if (c === "\\") { out += n ?? ""; i += 2; continue; }
+			if (c === '"') inStr = false;
+			i++;
+		} else if (c === '"') { inStr = true; out += c; i++; }
+		else if (c === "/" && n === "/") { while (i < src.length && src[i] !== "\n") i++; }
+		else if (c === "/" && n === "*") { i += 2; while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++; i += 2; }
+		else { out += c; i++; }
+	}
+	return out.replace(/,(\s*[}\]])/g, "$1");
+}
+
+export interface Loaded { config?: Config; errors: string[]; sources: Record<string, string> }
+
+function readJson(path: string): unknown {
+	return JSON.parse(stripJsonComments(readFileSync(path, "utf8")));
+}
+
+/**
+ * Loads layouts.json (settings, pinned, built-in layouts) plus every ~/.contextdeck/layouts/*.json.
+ * Each file there holds one layout (or {"layouts": [...]}); a file layout replaces a same-id layout from layouts.json.
+ * A broken file only drops that file's layouts; the rest still load.
+ */
+export function loadConfig(path = CONFIG_PATH, dir: string | null = LAYOUTS_DIR): Loaded {
+	const errors: string[] = [];
+	const sources: Record<string, string> = {};
+	let base: Config;
+	try {
+		base = readJson(path) as Config;
+		const baseErrors = validate(base);
+		if (baseErrors.length) return { errors: baseErrors.map((e) => `layouts.json: ${e}`), sources };
+	} catch (e) {
+		return { errors: [`${path}: ${(e as Error).message}`], sources };
+	}
+	const byId = new Map<string, LayoutDef>();
+	for (const l of base.layouts) { byId.set(l.id, l); sources[l.id] = path; }
+	if (dir && existsSync(dir)) {
+		for (const f of listJson(dir)) {
+			const file = join(dir, f);
+			try {
+				if (!readFileSync(file, "utf8").trim()) continue; // an emptied file = disabled layout
+				const raw = readJson(file) as LayoutDef | { layouts: LayoutDef[] };
+				const list = "layouts" in raw && Array.isArray(raw.layouts) ? raw.layouts : [raw as LayoutDef];
+				const errs = validate({ layouts: list });
+				if (errs.length) { errors.push(...errs.map((e) => `layouts/${f}: ${e}`)); continue; }
+				for (const l of list) { byId.set(l.id, l); sources[l.id] = file; }
+			} catch (e) {
+				errors.push(`layouts/${f}: ${(e as Error).message}`);
+			}
+		}
+	}
+	return { config: { ...base, layouts: [...byId.values()] }, errors, sources };
+}
+
+/** layouts/**\/*.json (two levels deep), sorted so load order is stable. */
+export function listJson(dir: string, prefix = "", depth = 0): string[] {
+	const out: string[] = [];
+	for (const e of readdirSync(dir, { withFileTypes: true })) {
+		if (e.name.startsWith(".")) continue;
+		if (e.isDirectory() && depth < 2) out.push(...listJson(join(dir, e.name), `${prefix}${e.name}/`, depth + 1));
+		else if (e.isFile() && e.name.endsWith(".json")) out.push(`${prefix}${e.name}`);
+	}
+	return out.sort();
+}
+
+const slug = (id: string) => id.replace(/[^\w.-]+/g, "_");
+/** Canonical file for a layout: layouts/<level folder>/<id>.json */
+export const layoutFile = (id: string, dir = LAYOUTS_DIR, layout?: LayoutDef) => {
+	const level = levelOf(layout ?? { id });
+	const folder = level === "sub" && id.startsWith("sub.") ? "subs" : LEVEL_DIRS[level];
+	return join(dir, folder, `${slug(id)}.json`);
+};
+
+/** Writes one layout to layouts/<id>.json, and drops any same-id copy from layouts.json so the file is the single source. */
+export function writeLayout(layout: LayoutDef, dir = LAYOUTS_DIR, basePath = CONFIG_PATH): string {
+	const errors = validate({ layouts: [layout] });
+	if (errors.length) throw new Error(errors.join("\n"));
+	const file = layoutFile(layout.id, dir, layout);
+	for (const f of existsSync(dir) ? listJson(dir) : []) {
+		const p = join(dir, f);
+		if (p === file) continue;
+		try { if ((readJson(p) as LayoutDef).id === layout.id) unlinkSync(p); } catch { /* ignore */ }
+	}
+	mkdirSync(dirname(file), { recursive: true });
+	writeFileSync(file, JSON.stringify(layout, null, "\t"));
+	removeFromBase(layout.id, basePath);
+	return file;
+}
+
+export function deleteLayout(id: string, dir = LAYOUTS_DIR, basePath = CONFIG_PATH): boolean {
+	let removed = false;
+	for (const f of existsSync(dir) ? listJson(dir) : []) {
+		const file = join(dir, f);
+		try {
+			const raw = readJson(file) as LayoutDef;
+			if (raw.id === id) { unlinkSync(file); removed = true; }
+		} catch { /* ignore */ }
+	}
+	return removeFromBase(id, basePath) || removed;
+}
+
+function removeFromBase(id: string, basePath: string): boolean {
+	try {
+		const base = readJson(basePath) as Config;
+		const before = base.layouts.length;
+		base.layouts = base.layouts.filter((l) => l.id !== id);
+		if (base.layouts.length === before) return false;
+		writeFileSync(basePath, JSON.stringify(base, null, "\t"));
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Calls onChange (debounced) when layouts.json or anything in layouts/ is saved. Watches folders so editor atomic-saves work. */
+export function watchConfig(onChange: () => void): () => void {
+	let t: NodeJS.Timeout | undefined;
+	const fire = () => { clearTimeout(t); t = setTimeout(onChange, 200); };
+	const a = watch(HOME_DIR, (_e, file) => { if (!file || ["config.json", "layouts.json"].includes(file.toString())) fire(); });
+	const b = watch(LAYOUTS_DIR, { recursive: true }, (_e, file) => { if (!file || file.toString().endsWith(".json")) fire(); });
+	return () => { a.close(); b.close(); };
+}

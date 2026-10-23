@@ -1,0 +1,58 @@
+{
+	"id": "app.desktop.evening",
+	"name": "Wind-down",
+	"color": "#818CF8",
+	"match": {
+		"time": [
+			"21:30",
+			"02:00"
+		],
+		"bundleId": [
+			"com.apple.finder",
+			"com.apple.loginwindow"
+		]
+	},
+	"keys": [
+		{
+			"label": "Wins",
+			"sub": "log today",
+			"icon": "trophy",
+			"action": {
+				"type": "open",
+				"target": "Notes"
+			}
+		},
+		{
+			"label": "Tomorrow",
+			"sub": "top 3",
+			"icon": "list-todo",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "clipboard",
+				"prompt": "Turn these notes into a calm plan for tomorrow: top 3 priorities, one line each."
+			}
+		},
+		{
+			"label": "Backup",
+			"sub": "Time Machine",
+			"icon": "hard-drive-download",
+			"action": {
+				"type": "shell",
+				"cmd": "tmutil startbackup"
+			}
+		},
+		null,
+		{
+			"label": "Sleep",
+			"sub": "display",
+			"icon": "moon",
+			"color": "#818CF8",
+			"action": {
+				"type": "shell",
+				"cmd": "pmset displaysleepnow"
+			}
+		}
+	],
+	"level": "app"
+}

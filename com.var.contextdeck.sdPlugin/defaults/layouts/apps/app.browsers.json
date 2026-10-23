@@ -1,0 +1,191 @@
+{
+	"id": "app.browsers",
+	"name": "Browser",
+	"color": "#14B8A6",
+	"generic": true,
+	"match": {
+		"bundleId": [
+			"com.google.Chrome*",
+			"com.apple.Safari*",
+			"com.brave.Browser",
+			"company.thebrowser.Browser",
+			"com.microsoft.edgemac",
+			"org.mozilla.firefox",
+			"com.vivaldi.Vivaldi"
+		]
+	},
+	"keys": [
+		{
+			"label": "New Tab",
+			"icon": "plus",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+t"
+			}
+		},
+		{
+			"label": "Close Tab",
+			"icon": "x",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+w"
+			}
+		},
+		{
+			"label": "Duplicate",
+			"sub": "tab",
+			"icon": "copy",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+l alt+return"
+			}
+		},
+		{
+			"label": "Reopen",
+			"sub": "closed tab",
+			"icon": "rotate-ccw",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+shift+t"
+			}
+		},
+		{
+			"label": "Back",
+			"icon": "arrow-left",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+["
+			}
+		},
+		{
+			"label": "Copy URL",
+			"icon": "link",
+			"action": {
+				"type": "copy",
+				"text": "{{ctx.url}}"
+			}
+		},
+		{
+			"label": "Summarize",
+			"sub": "selection",
+			"icon": "list",
+			"color": "#D97757",
+			"action": {
+				"type": "llm",
+				"input": "selection",
+				"output": "notify",
+				"prompt": "Summarize in 3 short bullet points."
+			}
+		}
+	],
+	"dials": [
+		{
+			"label": "Tabs",
+			"icon": "panels-top-left",
+			"cw": {
+				"type": "keys",
+				"keys": "ctrl+tab"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "ctrl+shift+tab"
+			}
+		},
+		{
+			"label": "Scroll",
+			"icon": "mouse",
+			"cw": {
+				"type": "keys",
+				"keys": "down down down"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "up up up"
+			}
+		},
+		{
+			"label": "Zoom",
+			"icon": "zoom-in",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+="
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+-"
+			},
+			"press": {
+				"type": "keys",
+				"keys": "cmd+0"
+			}
+		}
+	],
+	"level": "app",
+	"pages": [
+		{
+			"name": "Tabs",
+			"keys": [
+				{
+					"label": "Pin Tab",
+					"icon": "pin",
+					"action": {
+						"type": "menu",
+						"path": [
+							"Tab",
+							"Pin Tab"
+						]
+					}
+				},
+				{
+					"label": "Forward",
+					"icon": "arrow-right",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+]"
+					}
+				},
+				{
+					"label": "Reload",
+					"icon": "refresh-cw",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+r"
+					}
+				},
+				{
+					"label": "New Window",
+					"icon": "app-window",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+n"
+					}
+				},
+				{
+					"label": "Private",
+					"sub": "window",
+					"icon": "eye-off",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+shift+n"
+					}
+				},
+				{
+					"label": "History",
+					"icon": "history",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+y"
+					}
+				},
+				{
+					"label": "Downloads",
+					"icon": "download",
+					"action": {
+						"type": "keys",
+						"keys": "cmd+shift+j"
+					}
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,65 @@
+{
+	"id": "app.us.zoom.xos",
+	"name": "Zoom",
+	"color": "#3B82F6",
+	"priority": 5,
+	"match": {
+		"bundleId": "us.zoom.xos"
+	},
+	"keys": [
+		{
+			"label": "Mute",
+			"icon": "mic-off",
+			"color": "#EF4444",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+shift+a"
+			}
+		},
+		{
+			"label": "Camera",
+			"icon": "video-off",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+shift+v"
+			}
+		},
+		{
+			"label": "Share",
+			"icon": "monitor-up",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+shift+s"
+			}
+		},
+		{
+			"label": "Raise hand",
+			"icon": "hand",
+			"action": {
+				"type": "keys",
+				"keys": "alt+y"
+			}
+		},
+		{
+			"label": "Note",
+			"sub": "action item",
+			"icon": "notebook-pen",
+			"action": {
+				"type": "open",
+				"target": "Notes"
+			}
+		},
+		null,
+		{
+			"label": "Leave",
+			"sub": "hold",
+			"icon": "phone-off",
+			"color": "#EF4444",
+			"hold": {
+				"type": "keys",
+				"keys": "cmd+w"
+			}
+		}
+	],
+	"level": "app"
+}

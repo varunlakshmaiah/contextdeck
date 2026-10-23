@@ -1,0 +1,108 @@
+{
+	"id": "app.default",
+	"name": "Home",
+	"color": "#F97316",
+	"keys": [
+		{
+			"label": "Resolve",
+			"icon": "clapperboard",
+			"action": {
+				"type": "open",
+				"target": "DaVinci Resolve"
+			}
+		},
+		{
+			"label": "Studio",
+			"sub": "YouTube",
+			"icon": "square-play",
+			"action": {
+				"type": "open",
+				"target": "https://studio.youtube.com"
+			}
+		},
+		{
+			"label": "Calendar",
+			"icon": "calendar",
+			"action": {
+				"type": "open",
+				"target": "Calendar"
+			}
+		},
+		{
+			"label": "Mail",
+			"icon": "mail",
+			"action": {
+				"type": "open",
+				"target": "Mail"
+			}
+		},
+		{
+			"label": "Notes",
+			"icon": "notebook-pen",
+			"action": {
+				"type": "open",
+				"target": "Notes"
+			}
+		},
+		{
+			"label": "Claude",
+			"icon": "sparkles",
+			"color": "#D97757",
+			"action": {
+				"type": "open",
+				"target": "Claude"
+			}
+		},
+		{
+			"label": "Finder",
+			"icon": "folder-open",
+			"action": {
+				"type": "open",
+				"target": "Finder"
+			}
+		}
+	],
+	"dials": [
+		{
+			"label": "Apps",
+			"icon": "app-window",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+tab"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+shift+tab"
+			}
+		},
+		{
+			"label": "Spaces",
+			"icon": "columns-3",
+			"cw": {
+				"type": "keys",
+				"keys": "ctrl+right"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "ctrl+left"
+			},
+			"press": {
+				"type": "keys",
+				"keys": "ctrl+up"
+			}
+		},
+		{
+			"label": "Scroll",
+			"icon": "mouse",
+			"cw": {
+				"type": "keys",
+				"keys": "down down down"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "up up up"
+			}
+		}
+	],
+	"level": "app"
+}

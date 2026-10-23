@@ -1,0 +1,244 @@
+{
+	"id": "system",
+	"name": "System",
+	"level": "system",
+	"color": "#D97757",
+	"keys": [
+		{
+			"label": "{{llm}}",
+			"sub": "hold: menu",
+			"icon": "sparkles",
+			"color": "#D97757",
+			"action": {
+				"type": "overlay",
+				"overlay": {
+					"title": "AI on selection",
+					"keys": [
+						{
+							"label": "Fix",
+							"sub": "grammar",
+							"icon": "spell-check",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "paste",
+								"prompt": "Fix spelling, grammar and punctuation. Keep my voice, wording and formatting. Return only the corrected text."
+							}
+						},
+						{
+							"label": "Rewrite",
+							"sub": "3 options",
+							"icon": "pen-line",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "choices",
+								"prompt": "Rewrite this 3 ways: tighter, warmer, punchier. One version per line."
+							}
+						},
+						{
+							"label": "Summarize",
+							"icon": "list",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "notify",
+								"prompt": "Summarize in 3 short bullet points."
+							}
+						},
+						{
+							"label": "Explain",
+							"icon": "lightbulb",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "notify",
+								"prompt": "Explain this plainly in under 80 words."
+							}
+						},
+						{
+							"label": "Translate",
+							"sub": "→ English",
+							"icon": "languages",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "paste",
+								"prompt": "Translate to natural English. If it's already English, translate to Hindi. Return only the translation."
+							}
+						},
+						{
+							"label": "Reply",
+							"sub": "draft",
+							"icon": "reply",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "clipboard",
+								"prompt": "Draft a short, friendly reply to this message in my voice: direct, no fluff."
+							}
+						},
+						{
+							"label": "Answer",
+							"icon": "message-circle-question",
+							"color": "#D97757",
+							"action": {
+								"type": "llm",
+								"input": "selection",
+								"output": "notify",
+								"prompt": "Answer this question concisely."
+							}
+						},
+						{
+							"label": "Close",
+							"icon": "x",
+							"color": "#71717A",
+							"action": {
+								"type": "closeOverlay"
+							}
+						}
+					]
+				}
+			},
+			"hold": {
+				"type": "deckMenu"
+			}
+		},
+		{
+			"label": "Screenshot",
+			"icon": "scan",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+shift+5"
+			}
+		},
+		{
+			"label": "Spotlight",
+			"icon": "search",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+space"
+			}
+		},
+		{
+			"label": "Mission",
+			"sub": "Control",
+			"icon": "layout-grid",
+			"action": {
+				"type": "keys",
+				"keys": "ctrl+up"
+			}
+		},
+		{
+			"label": "Emoji",
+			"icon": "smile",
+			"action": {
+				"type": "keys",
+				"keys": "ctrl+cmd+space"
+			}
+		},
+		{
+			"label": "Sleep",
+			"sub": "display",
+			"icon": "moon",
+			"action": {
+				"type": "shell",
+				"cmd": "pmset displaysleepnow"
+			}
+		},
+		{
+			"label": "Battery",
+			"icon": "battery",
+			"info": {
+				"source": {
+					"type": "command",
+					"cmd": [
+						"/usr/bin/pmset",
+						"-g",
+						"batt"
+					]
+				},
+				"extract": "/(\\d+)%/",
+				"format": "{{value}}%",
+				"progress": {
+					"max": 100
+				},
+				"every": 120,
+				"thresholds": [
+					{
+						"below": 20,
+						"color": "#EF4444"
+					},
+					{
+						"below": 40,
+						"color": "#FBBF24"
+					}
+				]
+			}
+		},
+		{
+			"label": "Lock",
+			"icon": "lock",
+			"color": "#71717A",
+			"hold": {
+				"type": "keys",
+				"keys": "ctrl+cmd+q"
+			},
+			"sub": "hold"
+		}
+	],
+	"dials": [
+		{
+			"kind": "volume",
+			"label": "Volume",
+			"icon": "volume-2",
+			"step": 3
+		},
+		{
+			"label": "Apps",
+			"icon": "app-window",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+tab"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+shift+tab"
+			}
+		},
+		{
+			"label": "Spaces",
+			"icon": "columns-3",
+			"cw": {
+				"type": "keys",
+				"keys": "ctrl+right"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "ctrl+left"
+			},
+			"press": {
+				"type": "keys",
+				"keys": "ctrl+up"
+			}
+		},
+		{
+			"label": "Scroll",
+			"icon": "mouse",
+			"cw": {
+				"type": "keys",
+				"keys": "down down down"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "up up up"
+			}
+		}
+	]
+}

@@ -1,0 +1,199 @@
+{
+	"id": "app.code-editors",
+	"name": "Code",
+	"color": "#38BDF8",
+	"match": {
+		"bundleId": [
+			"com.microsoft.VSCode",
+			"com.todesktop.230313mzl4w4u92",
+			"dev.zed.Zed",
+			"com.exafunction.windsurf"
+		]
+	},
+	"keys": [
+		{
+			"label": "Palette",
+			"icon": "command",
+			"action": {
+				"type": "keys",
+				"keys": "cmd+shift+p"
+			}
+		},
+		{
+			"label": "Terminal",
+			"icon": "square-terminal",
+			"action": {
+				"type": "keys",
+				"keys": "ctrl+`"
+			}
+		},
+		{
+			"label": "Explain",
+			"icon": "lightbulb",
+			"color": "#D97757",
+			"action": {
+				"type": "llm",
+				"input": "selection",
+				"output": "notify",
+				"prompt": "Explain what this code does and flag any bug, in under 80 words."
+			}
+		},
+		{
+			"label": "Fix",
+			"sub": "selection",
+			"icon": "wrench",
+			"color": "#D97757",
+			"action": {
+				"type": "llm",
+				"input": "selection",
+				"output": "paste",
+				"prompt": "Fix bugs in this code with minimal changes. Return only the code, no fences, same indentation."
+			}
+		},
+		{
+			"label": "Agent",
+			"sub": "{{state.agent.status}}",
+			"stateKey": "agent.status",
+			"stateColors": {
+				"running": "#FBBF24",
+				"waiting": "#F97316",
+				"done": "#22C55E",
+				"error": "#EF4444"
+			},
+			"action": {
+				"type": "open",
+				"target": "Terminal"
+			}
+		},
+		{
+			"label": "Approve",
+			"sub": "agent prompt",
+			"icon": "check",
+			"color": "#22C55E",
+			"action": {
+				"type": "keys",
+				"keys": "return"
+			}
+		},
+		{
+			"label": "Deny",
+			"icon": "ban",
+			"color": "#EF4444",
+			"action": {
+				"type": "keys",
+				"keys": "esc"
+			}
+		}
+	],
+	"dials": [
+		{
+			"label": "Tabs",
+			"icon": "panels-top-left",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+alt+right"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+alt+left"
+			}
+		},
+		{
+			"label": "Problems",
+			"icon": "bug",
+			"cw": {
+				"type": "keys",
+				"keys": "f8"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "shift+f8"
+			}
+		},
+		{
+			"label": "Font",
+			"icon": "a-large-small",
+			"cw": {
+				"type": "keys",
+				"keys": "cmd+="
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "cmd+-"
+			}
+		}
+	],
+	"level": "app",
+	"pages": [
+		{
+			"name": "GitHub",
+			"keys": [
+				{
+					"label": "GitHub",
+					"icon": "bell",
+					"requires": [
+						"GITHUB_TOKEN"
+					],
+					"info": {
+						"source": {
+							"type": "http",
+							"url": "https://api.github.com/notifications",
+							"headers": {
+								"Authorization": "Bearer {{secret.GITHUB_TOKEN}}",
+								"Accept": "application/vnd.github+json"
+							}
+						},
+						"extract": "length",
+						"format": "{{value}}",
+						"every": 120,
+						"thresholds": [
+							{
+								"above": 0,
+								"color": "#38BDF8"
+							}
+						]
+					},
+					"sub": "notifications"
+				},
+				{
+					"label": "My PRs",
+					"icon": "git-pull-request",
+					"requires": [
+						"GITHUB_TOKEN"
+					],
+					"info": {
+						"source": {
+							"type": "http",
+							"url": "https://api.github.com/search/issues?q=is:open+is:pr+author:@me",
+							"headers": {
+								"Authorization": "Bearer {{secret.GITHUB_TOKEN}}",
+								"Accept": "application/vnd.github+json"
+							}
+						},
+						"extract": "total_count",
+						"format": "{{value}}",
+						"every": 300
+					},
+					"sub": "open"
+				},
+				{
+					"label": "Open PRs",
+					"icon": "external-link",
+					"action": {
+						"type": "open",
+						"target": "https://github.com/pulls"
+					}
+				}
+			]
+		}
+	],
+	"secrets": {
+		"GITHUB_TOKEN": {
+			"description": "GitHub fine-grained token (read-only: notifications, pull requests)",
+			"url": "https://github.com/settings/tokens",
+			"hosts": [
+				"api.github.com"
+			]
+		}
+	}
+}

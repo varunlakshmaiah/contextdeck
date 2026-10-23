@@ -1,0 +1,154 @@
+{
+	"id": "site.youtube.com",
+	"name": "YouTube",
+	"level": "sub",
+	"color": "#FF0033",
+	"match": {
+		"url": [
+			"*://www.youtube.com/watch*",
+			"*://youtube.com/watch*",
+			"*://m.youtube.com/watch*"
+		]
+	},
+	"keys": [
+		{
+			"label": "Play/Pause",
+			"sub": "K",
+			"icon": "play",
+			"action": {
+				"type": "keys",
+				"keys": "k"
+			}
+		},
+		{
+			"label": "Back 10s",
+			"sub": "J",
+			"icon": "rotate-ccw",
+			"action": {
+				"type": "keys",
+				"keys": "j"
+			}
+		},
+		{
+			"label": "Fwd 10s",
+			"sub": "L",
+			"icon": "rotate-cw",
+			"action": {
+				"type": "keys",
+				"keys": "l"
+			}
+		},
+		{
+			"label": "Fullscreen",
+			"sub": "F",
+			"icon": "maximize-2",
+			"action": {
+				"type": "keys",
+				"keys": "f"
+			}
+		},
+		{
+			"label": "Captions",
+			"sub": "C",
+			"icon": "captions",
+			"action": {
+				"type": "keys",
+				"keys": "c"
+			}
+		},
+		{
+			"label": "Theater",
+			"sub": "T",
+			"icon": "rectangle-horizontal",
+			"action": {
+				"type": "keys",
+				"keys": "t"
+			}
+		},
+		{
+			"label": "Next",
+			"sub": "⇧N",
+			"icon": "skip-forward",
+			"action": {
+				"type": "keys",
+				"keys": "shift+n"
+			}
+		}
+	],
+	"dials": [
+		{
+			"label": "Seek",
+			"icon": "move-horizontal",
+			"cw": {
+				"type": "keys",
+				"keys": "right"
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "left"
+			},
+			"press": {
+				"type": "keys",
+				"keys": "k"
+			}
+		},
+		{
+			"label": "Speed",
+			"icon": "gauge",
+			"cw": {
+				"type": "keys",
+				"keys": "shift+."
+			},
+			"ccw": {
+				"type": "keys",
+				"keys": "shift+,"
+			}
+		}
+	],
+	"pages": [
+		{
+			"name": "Video",
+			"keys": [
+				{
+					"label": "Mute",
+					"sub": "M",
+					"icon": "volume-x",
+					"action": {
+						"type": "keys",
+						"keys": "m"
+					}
+				},
+				{
+					"label": "Mini",
+					"sub": "player",
+					"icon": "picture-in-picture-2",
+					"action": {
+						"type": "keys",
+						"keys": "i"
+					}
+				},
+				{
+					"label": "Summarize",
+					"sub": "transcript",
+					"icon": "list",
+					"color": "#D97757",
+					"action": {
+						"type": "llm",
+						"input": "clipboard",
+						"output": "notify",
+						"prompt": "Summarize this video transcript in 5 bullet points."
+					}
+				},
+				{
+					"label": "Copy time",
+					"sub": "link",
+					"icon": "link",
+					"action": {
+						"type": "copy",
+						"text": "{{ctx.url}}"
+					}
+				}
+			]
+		}
+	]
+}

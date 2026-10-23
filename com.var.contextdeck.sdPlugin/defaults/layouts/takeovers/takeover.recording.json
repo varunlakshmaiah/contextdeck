@@ -1,0 +1,65 @@
+{
+	"id": "takeover.recording",
+	"name": "Recording",
+	"color": "#EF4444",
+	"priority": 20,
+	"match": {
+		"flags": "recording"
+	},
+	"keys": [
+		{
+			"label": "Good take",
+			"icon": "thumbs-up",
+			"color": "#22C55E",
+			"action": {
+				"type": "shell",
+				"cmd": "echo \"$(date '+%F %T') GOOD\" >> ~/.contextdeck/takes.log"
+			}
+		},
+		{
+			"label": "Bad take",
+			"icon": "thumbs-down",
+			"color": "#EF4444",
+			"action": {
+				"type": "shell",
+				"cmd": "echo \"$(date '+%F %T') BAD\" >> ~/.contextdeck/takes.log"
+			}
+		},
+		{
+			"label": "Take",
+			"sub": "#{{state.take}}",
+			"glyph": "{{state.take}}",
+			"action": {
+				"type": "state",
+				"key": "take",
+				"value": 1
+			}
+		},
+		null,
+		null,
+		null,
+		{
+			"label": "Done",
+			"sub": "end session",
+			"icon": "square",
+			"color": "#71717A",
+			"action": {
+				"type": "flag",
+				"flag": "recording",
+				"value": false
+			}
+		}
+	],
+	"dials": [
+		{
+			"kind": "value",
+			"key": "take",
+			"label": "Take #",
+			"icon": "hash",
+			"min": 1,
+			"max": 99,
+			"step": 1
+		}
+	],
+	"level": "takeover"
+}

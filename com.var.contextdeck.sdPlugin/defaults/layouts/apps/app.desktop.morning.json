@@ -1,0 +1,78 @@
+{
+	"id": "app.desktop.morning",
+	"name": "Morning",
+	"color": "#FBBF24",
+	"match": {
+		"time": [
+			"06:00",
+			"11:00"
+		],
+		"bundleId": [
+			"com.apple.finder",
+			"com.apple.loginwindow"
+		]
+	},
+	"keys": [
+		{
+			"label": "Today",
+			"icon": "calendar-check",
+			"action": {
+				"type": "open",
+				"target": "Calendar"
+			}
+		},
+		{
+			"label": "Mail",
+			"icon": "mail",
+			"action": {
+				"type": "open",
+				"target": "Mail"
+			}
+		},
+		{
+			"label": "Top 3",
+			"sub": "plan my day",
+			"icon": "target",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "notify",
+				"prompt": "From these notes or tasks, pick my top 3 for today, one line each. If the input is empty or unrelated, ask me one question that would help."
+			}
+		},
+		{
+			"label": "Ideas",
+			"sub": "capture",
+			"icon": "lightbulb",
+			"action": {
+				"type": "open",
+				"target": "Notes"
+			}
+		},
+		{
+			"label": "Resolve",
+			"icon": "clapperboard",
+			"action": {
+				"type": "open",
+				"target": "DaVinci Resolve"
+			}
+		},
+		{
+			"label": "Studio",
+			"icon": "square-play",
+			"action": {
+				"type": "open",
+				"target": "https://studio.youtube.com"
+			}
+		},
+		{
+			"label": "Music",
+			"icon": "music",
+			"action": {
+				"type": "open",
+				"target": "Music"
+			}
+		}
+	],
+	"level": "app"
+}

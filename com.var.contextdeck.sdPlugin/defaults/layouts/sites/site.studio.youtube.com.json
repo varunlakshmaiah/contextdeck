@@ -1,0 +1,165 @@
+{
+	"id": "site.studio.youtube.com",
+	"name": "YouTube Studio",
+	"color": "#FF3B30",
+	"match": {
+		"url": "*studio.youtube.com*"
+	},
+	"keys": [
+		{
+			"label": "Titles",
+			"sub": "7 options",
+			"icon": "type",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "choices",
+				"prompt": "Write 7 YouTube titles for this video (script, transcript or summary in the input). Under 60 characters each, no clickbait lies."
+			}
+		},
+		{
+			"label": "Description",
+			"icon": "align-left",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "paste",
+				"prompt": "Write a YouTube description for this video: a 2-sentence hook, a short paragraph, then 3-5 relevant hashtags."
+			}
+		},
+		{
+			"label": "Chapters",
+			"icon": "list-ordered",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "paste",
+				"prompt": "From this transcript or marker list with timecodes, write YouTube chapters starting at 00:00, format 'MM:SS Title'. Return only the chapters."
+			}
+		},
+		{
+			"label": "Tags",
+			"icon": "tags",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "paste",
+				"prompt": "Give 15 comma-separated YouTube tags for this video, most specific first."
+			}
+		},
+		{
+			"label": "Thumbnail",
+			"sub": "text ideas",
+			"icon": "image",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "choices",
+				"prompt": "Give 7 thumbnail text options for this video, 2-4 words each, high contrast with the title."
+			}
+		},
+		{
+			"label": "Pin comment",
+			"icon": "pin",
+			"action": {
+				"type": "llm",
+				"input": "clipboard",
+				"output": "clipboard",
+				"prompt": "Write a short pinned comment for this video that sparks discussion with one specific question."
+			}
+		},
+		{
+			"label": "Subs",
+			"icon": "users",
+			"requires": [
+				"YOUTUBE_API_KEY",
+				"YOUTUBE_CHANNEL_ID"
+			],
+			"info": {
+				"source": {
+					"type": "http",
+					"url": "https://www.googleapis.com/youtube/v3/channels?part=statistics&id={{secret.YOUTUBE_CHANNEL_ID}}&key={{secret.YOUTUBE_API_KEY}}"
+				},
+				"extract": "items[0].statistics.subscriberCount",
+				"format": "{{value|k}}",
+				"every": 900
+			},
+			"sub": "subscribers"
+		}
+	],
+	"level": "sub",
+	"pages": [
+		{
+			"name": "Channel",
+			"keys": [
+				{
+					"label": "Views",
+					"icon": "eye",
+					"requires": [
+						"YOUTUBE_API_KEY",
+						"YOUTUBE_CHANNEL_ID"
+					],
+					"info": {
+						"source": {
+							"type": "http",
+							"url": "https://www.googleapis.com/youtube/v3/channels?part=statistics&id={{secret.YOUTUBE_CHANNEL_ID}}&key={{secret.YOUTUBE_API_KEY}}"
+						},
+						"extract": "items[0].statistics.viewCount",
+						"format": "{{value|k}}",
+						"every": 900
+					},
+					"sub": "total views"
+				},
+				{
+					"label": "Videos",
+					"icon": "film",
+					"requires": [
+						"YOUTUBE_API_KEY",
+						"YOUTUBE_CHANNEL_ID"
+					],
+					"info": {
+						"source": {
+							"type": "http",
+							"url": "https://www.googleapis.com/youtube/v3/channels?part=statistics&id={{secret.YOUTUBE_CHANNEL_ID}}&key={{secret.YOUTUBE_API_KEY}}"
+						},
+						"extract": "items[0].statistics.videoCount",
+						"format": "{{value}}",
+						"every": 900
+					}
+				},
+				{
+					"label": "Upload",
+					"icon": "upload",
+					"action": {
+						"type": "open",
+						"target": "https://www.youtube.com/upload"
+					}
+				},
+				{
+					"label": "Comments",
+					"icon": "message-square",
+					"action": {
+						"type": "open",
+						"target": "https://studio.youtube.com/channel/comments"
+					}
+				}
+			]
+		}
+	],
+	"secrets": {
+		"YOUTUBE_API_KEY": {
+			"description": "YouTube Data API v3 key (Google Cloud console → APIs & Services → Credentials)",
+			"url": "https://console.cloud.google.com/apis/credentials",
+			"hosts": [
+				"www.googleapis.com"
+			]
+		},
+		"YOUTUBE_CHANNEL_ID": {
+			"description": "Your channel ID (starts with UC…, YouTube Studio → Settings → Channel → Advanced)",
+			"url": "https://www.youtube.com/account_advanced",
+			"hosts": [
+				"www.googleapis.com"
+			]
+		}
+	}
+}
