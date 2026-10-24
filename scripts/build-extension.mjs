@@ -2,7 +2,7 @@
 //   node scripts/build-extension.mjs  →  out/extension/{chrome,firefox}/ and out/contextdeck-extension-{chrome,firefox}.zip
 import { Resvg } from "@resvg/resvg-js";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const version = JSON.parse(readFileSync("com.var.contextdeck.sdPlugin/manifest.json", "utf8")).Version.split(".").slice(0, 3).join(".");
@@ -35,6 +35,10 @@ for (const [name, manifest] of Object.entries(targets)) {
 	writeFileSync(join(dir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 	for (const f of ["background.js", "options.html", "options.js"]) copyFileSync(join("extension", f), join(dir, f));
 	for (const size of [16, 48, 128]) writeFileSync(join(dir, `icon${size}.png`), new Resvg(svg, { fitTo: { mode: "width", value: size } }).render().asPng());
+	// Also ship it inside the plugin; the plugin copies it to ~/.contextdeck/extension/ for "Load unpacked".
+	const inPlugin = join("com.var.contextdeck.sdPlugin", "extension", name);
+	rmSync(inPlugin, { recursive: true, force: true });
+	cpSync(dir, inPlugin, { recursive: true });
 	const zip = join(process.cwd(), "out", `contextdeck-extension-${name}.zip`);
 	rmSync(zip, { force: true });
 	execFileSync("zip", ["-qr", zip, "."], { cwd: dir });

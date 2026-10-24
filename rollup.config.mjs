@@ -16,7 +16,7 @@ export default [
 		plugins: [
 			{ name: "watch-externals", buildStart() { this.addWatchFile(`${sdPlugin}/manifest.json`); } },
 			typescript({ include: ["src/**/*.ts"] }),
-			resolveNode(), commonjs(), !isWatching && terser(), modulePkg,
+			json(), resolveNode(), commonjs(), !isWatching && terser(), modulePkg,
 		],
 	},
 	{

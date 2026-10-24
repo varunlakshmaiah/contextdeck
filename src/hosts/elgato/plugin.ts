@@ -7,7 +7,7 @@ import { startApi } from "../../api";
 import { CONFIG_PATH, HOME_DIR, ensureHome, loadConfig, readToken, watchConfig } from "../../config";
 import { Engine } from "../../engine";
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 const log = streamDeck.logger.createScope("ContextDeck");
 streamDeck.logger.setLevel("info");
 

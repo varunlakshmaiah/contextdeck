@@ -1,6 +1,7 @@
 // ContextDeck settings. Layouts live in ./layouts/{system,apps,sites,takeovers}/<id>.json (one file each).
 // Naming: system | app.<bundleId> | app.<group> | site.<host> | sub.<bundleId>.<name> | takeover.<name>
-// Secrets: UPPER_SNAKE (<SERVICE>_API_KEY / _TOKEN / _URL), used as {{secret.NAME}}, stored in the Keychain:  ~/.contextdeck/deck secret set NAME
+// Secrets: UPPER_SNAKE (<SERVICE>_API_KEY / _TOKEN / _URL), used as {{secret.NAME}}, stored in your OS credential store: ~/.contextdeck/deck secret set NAME (or the ContextDeck app)
+// Windows/Linux: "cmdKey": "ctrl" (default) or "win" decides what "cmd" in layouts means. Other decks re-flow automatically; override with "deviceZones": { "xl": {…} }.
 // AI providers: "llm" = AI keys, "setupLlm" = ✨ Set up, optional "fallbackLlm". Presets: anthropic, openai, openrouter, groq, gemini, mistral, deepseek, xai, together, ollama, lmstudio.
 // Research for ✨ Set up: "research.provider" = none | brave | tavily | exa | searxng | openrouter-online (keys: BRAVE_SEARCH_API_KEY, TAVILY_API_KEY, EXA_API_KEY).
 {

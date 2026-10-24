@@ -1,18 +1,19 @@
 {
   "name": "contextdeck",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
-  "description": "Context-aware Stream Deck+ plugin: keys and dials redraw for whatever you're doing, with a local API and an MCP bridge for Claude.",
+  "description": "ContextDeck: context-aware Stream Deck plugin for macOS, Windows and Linux (OpenDeck), with a local app, browser extension, API, CLI and MCP bridge.",
   "scripts": {
     "icons": "node scripts/build-icons.mjs",
-    "build": "npm run icons && rollup -c",
+    "build": "npm run icons && rollup -c && node scripts/build-extension.mjs",
     "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.var.contextdeck\"",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
     "validate": "streamdeck validate com.var.contextdeck.sdPlugin",
     "pack": "streamdeck pack com.var.contextdeck.sdPlugin -o dist --force",
-    "link": "streamdeck link com.var.contextdeck.sdPlugin"
+    "link": "streamdeck link com.var.contextdeck.sdPlugin",
+    "test:e2e": "tsx test/smoke.ts && tsx test/extension.ts && tsx test/ui.ts"
   },
   "dependencies": {
     "@elgato/streamdeck": "^3.0.3"

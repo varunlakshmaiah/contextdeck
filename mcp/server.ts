@@ -49,10 +49,11 @@ const wrap = <A>(fn: (a: A) => Promise<unknown>) => async (a: A) => {
 	try { return text(await fn(a)); } catch (e) { return { ...text(`Error: ${(e as Error).message}`), isError: true }; }
 };
 
-const LAYOUT_DOC = `NAMING: ids are system | app.<bundleId> (or app.<group>) | site.<host> | sub.<bundleId>.<name> | takeover.<name>; set "level" to system|app|sub|takeover. Files land in ~/.contextdeck/layouts/{system,apps,sites,takeovers}/<id>.json.
+const LAYOUT_DOC = `APP IDS: macOS bundle id (com.google.Chrome), Windows exe name lowercase (chrome.exe), Linux WM_CLASS/app id lowercase (google-chrome). One layout can list all three in match.bundleId.
+NAMING: ids are system | app.<bundleId> (or app.<group>) | site.<host> | sub.<bundleId>.<name> | takeover.<name>; set "level" to system|app|sub|takeover. Files land in ~/.contextdeck/layouts/{system,apps,sites,takeovers}/<id>.json.
 LEVELS: the deck shows system (AI key, volume) + app (the app in front, e.g. browser tab ops) + sub (the site/tab or window inside it). Sub layouts must NOT repeat app-level actions.
-Page 1 mixes them (sub keys 0-3, app keys 4-6, system key 7; dials sub 0-1, app 2, system 3); each layout also gets its own full page; "pages": [{name, keys, dials}] adds more.
-Layout JSON: { id, level, name?, color? (hex, also the top stripe of its keys), priority?, match?: { bundleId?, app?, url?, title?, sub? (globs, * wildcard, or "/regex/i"), time?: ["HH:MM","HH:MM"], days?, flags?, notFlags? },
+Layouts are written for the Stream Deck + (8 keys, 4 dials); other decks (Mini, MK.2, XL, Neo, Studio, + XL, Mobile) re-flow them automatically, and bigger decks also show the extra pages on page 1. Page 1 on the + mixes them (sub keys 0-3, app keys 4-6, system key 7; dials sub 0-1, app 2, system 3); each layout also gets its own full page; "pages": [{name, keys, dials}] adds more.
+Layout JSON: { id, level, name?, color? (hex, also the top stripe of its keys), priority?, match?: { bundleId?, app?, url?, title?, sub? (globs, * wildcard, or "/regex/i"), time?: ["HH:MM","HH:MM"], days?, flags?, notFlags?, os?: "mac"|"win"|"linux" },
 keys?: ordered MOST IMPORTANT FIRST (up to 8; null = blank), dials?: up to 4, pages?, modes?: { name: { keys?, dials? } }, defaultMode?, probe?: {type:"windowTitle"} | {type:"applescript",script} (native app sub-context → match.sub),
 secrets?: { NAME: { description, url, hosts: ["api.example.com" | "secret:OTHER_URL_SECRET"] } } }.
 Key: { label, sub?, icon? (lucide name), glyph?, color?, stateKey?, stateColors?, action?, release?, hold?, info?, requires?: ["SECRET_NAME"] }.
@@ -63,10 +64,12 @@ Action: {type:"keys",keys:"cmd+shift+4"} (space-separated sequence ok) | {type:"
 {type:"http",url,method?,headers?,body?} (use {{secret.NAME}} placeholders, never real keys) | {type:"menu",path:["View","Zoom In"]} (use deck_read_menus) |
 {type:"mode",mode} | {type:"page",page:"next"|"prev"|"sub"|"app"|"system"|<id>} | {type:"layout",id|null} | {type:"flag",flag,value?} | {type:"state",key,value} | {type:"copy",text} |
 {type:"overlay",overlay:{title,items:[{label,value?}],onPick:"copy"|"paste"}} | {type:"llm",prompt,input?,output?:"clipboard"|"paste"|"notify"|"choices",provider?,model?} | {type:"sequence",steps,delayMs?} |
-{type:"secretSet",name} | {type:"setup",force?,update?} | {type:"deckMenu"} | {type:"editLayout"} | {type:"reload"}.
+{type:"secretSet",name} | {type:"setup",force?,update?} | {type:"deckMenu"} | {type:"editLayout"} | {type:"reload"} | {type:"ui"} |
+{type:"elgato",tool,args?} (an action from the Stream Deck app's "MCP Actions" profile; see deck_elgato_tools) | {type:"script",script,lang?:"applescript"|"jxa"|"powershell"|"sh"}.
+CROSS-PLATFORM: chords use cmd/ctrl/alt/shift/win; "mod" = cmd on macOS, ctrl elsewhere; "cmd" on Windows/Linux becomes ctrl (settings.cmdKey). Any action may carry "on": {"win": {…action}, "linux": {…action}} replacements, and info specs "on": {"win": {source…}}.
 Strings support {{state.x}}, {{ctx.app}}, {{ctx.url}}, {{mode}}, {{llm}}. State keys are dotted lowercase (agent.status); secrets UPPER_SNAKE (SERVICE_API_KEY, SERVICE_TOKEN, SERVICE_URL).`;
 
-const server = new McpServer({ name: "contextdeck", version: "0.4.0" });
+const server = new McpServer({ name: "contextdeck", version: "0.5.0" });
 
 server.registerTool("deck_status", {
 	description: "What the Stream Deck+ is showing right now: active layout and mode, the frontmost app/URL it detected, flags, state values, and key labels.",
@@ -131,7 +134,7 @@ server.registerTool("deck_upsert_layout", {
 }));
 
 server.registerTool("deck_read_menus", {
-	description: "List the menu bar items and their real keyboard shortcuts for a running Mac app (default: the app in front). Use the results to build accurate layouts: chord -> {type:'keys'}, no chord -> {type:'menu', path}.",
+	description: "List the menu bar items and their real keyboard shortcuts for a running app (default: the app in front; macOS menus, Windows classic menu bars; not Linux). Use the results to build accurate layouts: chord -> {type:'keys'}, no chord -> {type:'menu', path}.",
 	inputSchema: { bundleId: z.string().optional().describe("e.g. com.figma.Desktop; omit for the frontmost app"), all: z.boolean().default(false).describe("include boilerplate items like Copy/Paste/Quit") },
 }, wrap(async ({ bundleId, all }) => {
 	const q = new URLSearchParams();
@@ -160,8 +163,21 @@ server.registerTool("deck_page", {
 }, wrap(async ({ page }) => api("POST", "/page", { page })));
 
 server.registerTool("deck_secrets", {
-	description: "List the secrets (API keys/tokens) the layouts use: names, allowed hosts, which layouts use them, and whether each is stored. Never returns values. The user stores one with: ~/.contextdeck/deck secret set NAME (or by pressing the key that says 'needs NAME').",
+	description: "List the secrets (API keys/tokens) the layouts use: names, allowed hosts, which layouts use them, and whether each is stored. Never returns values. The user stores one with: ~/.contextdeck/deck secret set NAME, the ContextDeck app (Keys & secrets) (or by pressing the key that says 'needs NAME').",
 }, wrap(async () => api("GET", "/secrets")));
+
+server.registerTool("deck_elgato_tools", {
+	description: "List actions from the user's other Stream Deck plugins (OBS, Hue, Spotify …) that they put on the Stream Deck app's \"MCP Actions\" profile. Bind one to a key with {type:\"elgato\", tool}. macOS/Windows, Stream Deck 7.4+.",
+}, wrap(async () => api("GET", "/elgato/tools", undefined, 60_000)));
+
+server.registerTool("deck_elgato_run", {
+	description: "Trigger one of those Stream Deck plugin actions now.",
+	inputSchema: { tool: z.string(), args: z.record(z.string(), z.any()).optional() },
+}, wrap(async ({ tool, args }) => api("POST", "/elgato/run", { tool, args }, 60_000)));
+
+server.registerTool("deck_devices", {
+	description: "The Stream Decks connected (model, keys, dials, which one was used last).",
+}, wrap(async () => api("GET", "/devices")));
 
 server.registerTool("deck_delete_layout", {
 	description: "Delete a layout by id.",
