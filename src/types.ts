@@ -199,7 +199,8 @@ export interface Settings extends LlmSettings {
 	setupSlot?: number;                   // which key shows "Set up" (default 6)
 	setupIgnore?: string[];               // bundle IDs / hosts never offered setup
 	setupDwellMs?: number;                // auto mode: how long an app must stay in front before configuring (default 4000)
-	zones?: Partial<Record<"system" | "app" | "sub", Zone>>;
+	zones?: Partial<Record<"system" | "app" | "sub", Zone>>;   // Stream Deck + (and other 8-key/4-dial decks)
+	deviceZones?: Record<string, Partial<Record<"system" | "app" | "sub", Zone>>>;  // per device: "xl", "mk2", "mini", "neo", "studio", "plusxl", "mobile" … or "<cols>x<rows>"
 	research?: ResearchSettings;
 	secrets?: Record<string, SecretDecl>;   // global secret declarations (layouts can declare their own)
 }

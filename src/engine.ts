@@ -6,7 +6,7 @@ import { usefulEntries, type MenuEntry } from "./menus";
 import { platform, setCmdKey, type Platform as OsPlatform } from "./platform";
 import { loadIcons, renderDial, renderKey, toDataUrl } from "./render";
 import { digestPrompt, fetchPage, queriesFor, rankHits, search, type Digest, type Platform, type SearchHit } from "./research";
-import { DIAL_COUNT, KEY_COUNT, levelOf, normalize, pick, resolve, template } from "./resolve";
+import { KEY_COUNT, PLUS, isNative, levelOf, normalize, pick, resolve, template, type Geometry } from "./resolve";
 import { keychainStore, MissingSecretError, withSecrets, type SecretStore } from "./secrets";
 import { ICON_HINTS, buildPrompt, extractJson, planToLayout, targetForApp, targetForSite, type SetupTarget } from "./setup";
 import type { Action, Config, Context, DialDef, InfoSpec, KeyDef, LayoutDef, LlmAction, OverlaySpec, Resolved, SecretDecl } from "./types";
@@ -14,6 +14,22 @@ import type { Action, Config, Context, DialDef, InfoSpec, KeyDef, LayoutDef, Llm
 /** Minimal surface of the SDK action objects the engine needs (keeps the engine testable without Stream Deck). */
 export interface KeySurface { id: string; setImage(img?: string): Promise<void>; setTitle(t?: string): Promise<void>; showAlert(): Promise<void>; showOk(): Promise<void> }
 export interface DialSurface { id: string; setFeedback(f: Record<string, unknown>): Promise<void>; setTriggerDescription(d: Record<string, string>): Promise<void>; showAlert(): Promise<void> }
+
+/** A physical (or virtual) deck. Each one gets its own page, page memory and pressed/busy state. */
+export interface DeviceInfo extends Geometry { id: string; name?: string }
+
+class View {
+	resolved!: Resolved;
+	page: number | string = 0;
+	pageMemory = new Map<string, string>();
+	contextKey = "";
+	signature = "";
+	pressed = new Set<number>();
+	busy = new Map<number, string>();
+	flashes = new Map<number, { color: string; text?: string }>();
+	holdTimers = new Map<number, { timer: NodeJS.Timeout; held: boolean }>();
+	constructor(public id: string, public geo: Geometry, public name = id) {}
+}
 
 interface Overlay extends OverlaySpec { id: string; keys: (KeyDef | null)[]; timer?: NodeJS.Timeout }
 
@@ -63,7 +79,6 @@ export class Engine extends EventEmitter {
 	forcedLayout: string | null = null;
 	modes: Record<string, string> = {};
 	overlay: Overlay | null = null;
-	resolved!: Resolved;
 	sources: Record<string, string> = {};           // layout id -> file
 	setupState: Record<string, SetupRecord> = {};
 	setupRunning: string | null = null;
@@ -73,25 +88,67 @@ export class Engine extends EventEmitter {
 	onDiag: () => void = () => undefined;
 	diag: { detector: string; detectErrors: string[]; urlError: string; lastDetect: string } = { detector: "", detectErrors: [], urlError: "", lastDetect: "" };
 
-	private keys = new Map<string, { surface: KeySurface; index: number }>();
-	private dials = new Map<string, { surface: DialSurface; index: number }>();
+	private keys = new Map<string, { surface: KeySurface; index: number; device: string }>();
+	private dials = new Map<string, { surface: DialSurface; index: number; device: string }>();
+	private views = new Map<string, View>([["default", new View("default", PLUS, "Stream Deck +")]]);
+	/** The view being computed/drawn; between events it's the deck you touched last. */
+	private cur: View = this.views.get("default")!;
+	private active: View = this.cur;
+
+	get resolved(): Resolved { return this.cur.resolved; }
+	set resolved(r: Resolved) { this.cur.resolved = r; }
+	get geo(): Geometry { return this.cur.geo; }
+	private get page() { return this.cur.page; }
+	private set page(p: number | string) { this.cur.page = p; }
+	private get pageMemory() { return this.cur.pageMemory; }
+	private get contextKey() { return this.cur.contextKey; }
+	private set contextKey(k: string) { this.cur.contextKey = k; }
+	private get signature() { return this.cur.signature; }
+	private set signature(k: string) { this.cur.signature = k; }
+	private get pressed() { return this.cur.pressed; }
+	private get busy() { return this.cur.busy; }
+	private get flashes() { return this.cur.flashes; }
+	private get holdTimers() { return this.cur.holdTimers; }
+
+	/** Run fn with `v` as the current view (sync part only), then return to the active deck. */
+	private inView<T>(v: View, fn: () => T): T {
+		const prev = this.cur;
+		this.cur = v;
+		try { return fn(); } finally { this.cur = prev === v ? this.active : prev; }
+	}
+	/** An input arrived from this deck: it becomes the active one. */
+	private touch(device?: string): View {
+		const v = (device && this.views.get(device)) || this.active;
+		this.active = this.cur = v;
+		return v;
+	}
+	/** Views that have something registered (or the default one, for the API/tests). */
+	private liveViews(): View[] {
+		const used = new Set([...this.keys.values(), ...this.dials.values()].map((x) => x.device));
+		const vs = [...this.views.values()].filter((v) => used.has(v.id));
+		return vs.length ? vs : [this.views.get("default")!];
+	}
+	devices() { return [...this.views.values()].filter((v) => v.id !== "default" || this.liveViews()[0] === v).map((v) => ({ id: v.id, name: v.name, ...v.geo, active: v === this.active })); }
+	private viewFor(d?: DeviceInfo): View {
+		if (!d) return this.views.get("default")!;
+		let v = this.views.get(d.id);
+		if (!v) {
+			v = new View(d.id, { keys: d.keys, dials: d.dials, cols: d.cols, rows: d.rows, kind: d.kind }, d.name ?? d.kind ?? d.id);
+			this.views.set(d.id, v);
+			if (this.active.id === "default") this.active = this.cur = v;
+			this.inView(v, () => this.recomputeView(true));
+		}
+		return v;
+	}
 	private lastImage = new Map<string, string>();
-	private pressed = new Set<number>();
-	private busy = new Map<number, string>();
-	private flashes = new Map<number, { color: string; text?: string }>();
-	private holdTimers = new Map<number, { timer: NodeJS.Timeout; held: boolean }>();
 	private valueTimers = new Map<string, NodeJS.Timeout>();
 	private volume = 0;
 	private pollTimer?: NodeJS.Timeout;
 	private infoTimer?: NodeJS.Timeout;
-	private signature = "";
 	private needsTitle = false;
 	private pickWaiters = new Map<string, (v: { picked: string | null; index: number | null }) => void>();
 	private dwellTimer?: NodeJS.Timeout;
 	private dwellTarget = "";
-	private page: number | string = 0;
-	private pageMemory = new Map<string, string>();
-	private contextKey = "";
 	private probeAt = new Map<string, number>();
 	private infos = new Map<string, InfoResult>();
 	private infoInflight = new Set<string>();
@@ -121,7 +178,7 @@ export class Engine extends EventEmitter {
 
 	constructor() {
 		super();
-		this.resolved = resolve(this.config, this.ctx);
+		for (const v of this.views.values()) v.resolved = resolve(this.config, this.ctx, { geometry: v.geo });
 	}
 
 	/** The OS adapter (swap with setPlatform() in tests). */
@@ -146,9 +203,21 @@ export class Engine extends EventEmitter {
 	}
 
 	// ---------- registration ----------
-	addKey(surface: KeySurface, index: number) { this.keys.set(surface.id, { surface, index }); this.lastImage.delete(surface.id); this.drawKey(index); }
+	addKey(surface: KeySurface, index: number, device?: DeviceInfo) {
+		const v = this.viewFor(device);
+		this.keys.set(surface.id, { surface, index, device: v.id });
+		this.lastImage.delete(surface.id);
+		this.inView(v, () => this.drawKey(index));
+	}
 	removeKey(id: string) { this.keys.delete(id); this.lastImage.delete(id); }
-	addDial(surface: DialSurface, index: number) { this.dials.set(surface.id, { surface, index }); this.lastImage.delete(surface.id); this.drawDial(index); }
+	addDial(surface: DialSurface, index: number, device?: DeviceInfo) {
+		const v = this.viewFor(device);
+		this.dials.set(surface.id, { surface, index, device: v.id });
+		// The host may not say how many dials a deck has; trust what actually appears.
+		if (index >= v.geo.dials) { v.geo = { ...v.geo, dials: index + 1 }; v.contextKey = ""; this.inView(v, () => this.recomputeView(true)); }
+		this.lastImage.delete(surface.id);
+		this.inView(v, () => this.drawDial(index));
+	}
 	removeDial(id: string) { this.dials.delete(id); this.lastImage.delete(id); }
 
 	// ---------- context loop ----------
@@ -245,16 +314,21 @@ export class Engine extends EventEmitter {
 	}
 
 	recompute(force = false) {
-		const base = resolve(this.config, this.ctx, { forcedId: this.forcedLayout, modes: this.modes, page: 0 });
+		for (const v of this.liveViews()) this.inView(v, () => this.recomputeView(force, v === this.active || this.liveViews().length === 1));
+	}
+
+	private recomputeView(force = false, primary = true) {
+		const geometry = this.geo;
+		const base = resolve(this.config, this.ctx, { forcedId: this.forcedLayout, modes: this.modes, page: 0, geometry });
 		const ck = [base.levels.takeover?.id, base.levels.app?.id, base.levels.sub?.id].join("|");
 		if (ck !== this.contextKey) {
 			this.contextKey = ck;
 			this.page = this.pageMemory.get(ck) ?? 0;
 		}
-		const r = this.page === 0 ? base : resolve(this.config, this.ctx, { forcedId: this.forcedLayout, modes: this.modes, page: this.page });
+		const r = this.page === 0 ? base : resolve(this.config, this.ctx, { forcedId: this.forcedLayout, modes: this.modes, page: this.page, geometry });
 		const target = this.setupTargetFor(r);
 		if (target && r.page === 0) {
-			const slot = Math.min(KEY_COUNT - 1, Math.max(0, this.settings.setupSlot ?? 6));
+			const slot = isNative(geometry) ? Math.min(KEY_COUNT - 1, Math.max(0, this.settings.setupSlot ?? 6)) : normalize(this.config, geometry).zones.app.keys.filter((i) => i < geometry.keys).at(-1) ?? 0;
 			const rec = this.setupState[target.id];
 			r.keys = [...r.keys];
 			r.keyOwners = [...r.keyOwners];
@@ -266,8 +340,16 @@ export class Engine extends EventEmitter {
 			r.keyOwners[slot] = null;
 			if (!target.update) this.maybeAutoSetup(target);
 		}
+		// Decks without dials: the last key pages (tap = next, hold = previous).
+		if (geometry.dials === 0 && r.pages.length > 1 && geometry.keys >= 6) {
+			const at = geometry.keys - 1;
+			r.keys = [...r.keys];
+			r.keyOwners = [...r.keyOwners];
+			r.keys[at] = { label: r.pages[r.page].name.slice(0, 14), sub: `page ${r.page + 1}/${r.pages.length}`, icon: "chevrons-right", color: "#71717A", action: { type: "page", page: "next" }, hold: { type: "page", page: "prev" } };
+			r.keyOwners[at] = null;
+		}
 		const sig = `${ck}|${JSON.stringify(r.modes)}|${r.page}/${r.pages.length}|${this.ctx.now.getHours()}|${target?.id ?? ""}|${this.setupRunning ?? ""}`;
-		const layoutChanged = r.layout.id !== this.resolved.layout.id;
+		const layoutChanged = primary && r.layout.id !== this.resolved?.layout.id;
 		this.resolved = r;
 		if (layoutChanged) {
 			this.emit("context", this.snapshot());
@@ -295,6 +377,8 @@ export class Engine extends EventEmitter {
 			overlay: this.overlay ? { id: this.overlay.id, title: this.overlay.title } : null,
 			keys: this.currentSlots().map((s) => (s.def ? this.label(s.def) : null)),
 			dials: r.dials.map((d) => d?.label ?? null),
+			device: { id: this.cur.id, name: this.cur.name, ...this.geo },
+			devices: this.devices(),
 			configErrors: this.configErrors,
 			diagnostics: this.diag,
 			setup: { target: this.setupTargetFor(r)?.id ?? null, running: this.setupRunning, mode: this.settings.autoSetup ?? "key" },
@@ -310,13 +394,21 @@ export class Engine extends EventEmitter {
 	}
 	private label(k: KeyDef) { return template(k.label, this.scope()); }
 	private currentSlots(): Slot[] {
-		if (this.overlay) return this.overlay.keys.map((def) => ({ def, owner: null }));
+		if (this.overlay) {
+			const n = this.geo.keys, ks = this.overlay.keys;
+			if (n === ks.length) return ks.map((def) => ({ def, owner: null }));
+			// Re-flow onto this deck: items in order, Close on the last key.
+			const out: (KeyDef | null)[] = Array(n).fill(null);
+			ks.slice(0, -1).filter(Boolean).slice(0, n - 1).forEach((d, i) => (out[i] = d));
+			out[n - 1] = ks[ks.length - 1];
+			return out.map((def) => ({ def, owner: null }));
+		}
 		return this.resolved.keys.map((def, i) => ({ def, owner: this.resolved.keyOwners[i] }));
 	}
 
 	redrawAll() {
-		for (let i = 0; i < KEY_COUNT; i++) this.drawKey(i);
-		for (let i = 0; i < DIAL_COUNT; i++) this.drawDial(i);
+		for (let i = 0; i < this.geo.keys; i++) this.drawKey(i);
+		for (let i = 0; i < this.geo.dials; i++) this.drawDial(i);
 	}
 
 	private infoKey(owner: LayoutDef | null, spec: InfoSpec) { return `${owner?.id ?? "-"}|${JSON.stringify(spec)}`; }
@@ -362,7 +454,8 @@ export class Engine extends EventEmitter {
 
 	drawKey(index: number) {
 		for (const [id, k] of this.keys) {
-			if (k.index !== index) continue;
+			if (k.index !== index || k.device !== this.cur.id) continue;
+			if (index >= this.geo.keys) continue;
 			const img = toDataUrl(this.keyImage(index));
 			if (this.lastImage.get(id) === img) continue;
 			this.lastImage.set(id, img);
@@ -377,8 +470,8 @@ export class Engine extends EventEmitter {
 		const stripe = owner?.color ?? this.resolved.layout.color;
 		const pages = this.resolved.pages.length;
 		const nav = pages > 1 ? {
-			prev: index === 0, next: index === DIAL_COUNT - 1,
-			pageText: index === DIAL_COUNT - 1 ? `${this.resolved.page + 1}/${pages}` : index === 0 && this.resolved.page > 0 ? this.resolved.pages[this.resolved.page].name.slice(0, 16) : undefined,
+			prev: index === 0, next: index === this.geo.dials - 1,
+			pageText: index === this.geo.dials - 1 ? `${this.resolved.page + 1}/${pages}` : index === 0 && this.resolved.page > 0 ? this.resolved.pages[this.resolved.page].name.slice(0, 16) : undefined,
 		} : {};
 		if (!d) return { svg: renderDial({ label: "", color: this.accent, bg: this.bg, stripe, ...nav }), desc: {} };
 		const color = d.color ?? owner?.color ?? this.accent;
@@ -404,7 +497,7 @@ export class Engine extends EventEmitter {
 
 	drawDial(index: number) {
 		for (const [id, d] of this.dials) {
-			if (d.index !== index) continue;
+			if (d.index !== index || d.device !== this.cur.id) continue;
 			const { svg, desc } = this.dialVisual(index);
 			const img = toDataUrl(svg);
 			if (this.lastImage.get(id) === img) continue;
@@ -420,17 +513,19 @@ export class Engine extends EventEmitter {
 	}
 
 	private async refreshVolume() {
-		if (!this.resolved.dials.some((d) => d?.kind === "volume")) return;
+		if (!this.liveViews().some((v) => v.resolved?.dials.some((d) => d?.kind === "volume"))) return;
 		try {
 			const v = await this.os.getVolume();
-			if (v !== this.volume) { this.volume = v; this.resolved.dials.forEach((d, i) => d?.kind === "volume" && this.drawDial(i)); }
+			if (v !== this.volume) { this.volume = v; for (const view of this.liveViews()) this.inView(view, () => this.resolved.dials.forEach((d, i) => d?.kind === "volume" && this.drawDial(i))); }
 		} catch { /* ignore */ }
 	}
 
 	flash(index: number, color = "#22C55E", text?: string, ms = 1600) {
-		this.flashes.set(index, { color, text });
+		const v = this.cur;
+		if (index < 0 || index >= v.geo.keys) index = v.geo.keys - 1;
+		v.flashes.set(index, { color, text });
 		this.drawKey(index);
-		setTimeout(() => { this.flashes.delete(index); this.drawKey(index); }, ms);
+		setTimeout(() => this.inView(v, () => { v.flashes.delete(index); this.drawKey(index); }), ms);
 	}
 
 	// ---------- info + secrets ----------
@@ -483,13 +578,16 @@ export class Engine extends EventEmitter {
 	}
 
 	// ---------- input ----------
-	keyDown(index: number) {
+	keyDown(index: number, device?: string) {
+		this.touch(device);
+		if (index >= this.geo.keys) return;
 		const { def } = this.currentSlots()[index];
 		this.pressed.add(index);
 		this.drawKey(index);
 		if (!def) return;
 		if (def.hold) {
-			const entry = { held: false, timer: setTimeout(() => { entry.held = true; void this.exec(def.hold!, index); }, this.settings.holdMs ?? 500) };
+			const v = this.cur;
+			const entry = { held: false, timer: setTimeout(() => this.inView(v, () => { entry.held = true; void this.exec(def.hold!, index); }), this.settings.holdMs ?? 500) };
 			this.holdTimers.set(index, entry);
 		} else {
 			this.pressAction(index);
@@ -505,7 +603,9 @@ export class Engine extends EventEmitter {
 		else if (def.info) { this.infos.delete(this.infoKey(owner, def.info)); void this.pollInfo(); }
 	}
 
-	keyUp(index: number) {
+	keyUp(index: number, device?: string) {
+		this.touch(device);
+		if (index >= this.geo.keys) return;
 		const { def } = this.currentSlots()[index];
 		this.pressed.delete(index);
 		this.drawKey(index);
@@ -518,7 +618,8 @@ export class Engine extends EventEmitter {
 		if (def?.release) void this.exec(def.release, index);
 	}
 
-	async dialRotate(index: number, ticks: number) {
+	async dialRotate(index: number, ticks: number, device?: string) {
+		this.touch(device);
 		const d = this.resolved.dials[index];
 		if (!d) return;
 		const owner = this.resolved.dialOwners[index];
@@ -542,17 +643,19 @@ export class Engine extends EventEmitter {
 		}
 	}
 
-	dialPress(index: number) {
+	dialPress(index: number, device?: string) {
+		this.touch(device);
 		const d = this.resolved.dials[index];
 		if (d?.kind === "volume" && !d.press) return void this.os.toggleMute().catch(() => undefined);
 		if (d?.press) void this.exec(d.press, -1, this.resolved.dialOwners[index]);
 	}
 
 	/** Touch strip: tap the outer edges to change page; long-touch anywhere = next page; otherwise the dial's touch action. */
-	dialTouch(index: number, long: boolean, x = 100) {
+	dialTouch(index: number, long: boolean, x = 100, device?: string) {
+		this.touch(device);
 		const many = this.resolved.pages.length > 1;
 		if (many && index === 0 && x < 50) return this.goPage("prev");
-		if (many && index === DIAL_COUNT - 1 && x > 150) return this.goPage("next");
+		if (many && index === this.geo.dials - 1 && x > 150) return this.goPage("next");
 		const d = this.resolved.dials[index];
 		const a = long ? d?.longTouch ?? d?.touch : d?.touch;
 		if (a) return void this.exec(a, -1, this.resolved.dialOwners[index]);
@@ -649,7 +752,7 @@ export class Engine extends EventEmitter {
 					if (p.mode !== "return") await this.os.setClipboard(p.value);
 					this.closeOverlay({ picked: p.value, index: p.index });
 					if (p.mode === "paste") { await new Promise((r) => setTimeout(r, 80)); await this.os.sendKeys("mod+v"); }
-					else if (p.mode === "copy") this.flash(KEY_COUNT - 1, "#22C55E", "Copied", 900);
+					else if (p.mode === "copy") this.flash(this.geo.keys - 1, "#22C55E", "Copied", 900);
 					this.emit("pick", { id, ...p });
 					return;
 				}
@@ -794,7 +897,8 @@ export class Engine extends EventEmitter {
 		const tgt: Target = target;
 
 		const index = opts.index ?? this.settings.setupSlot ?? 6;
-		const busy = (msg: string) => { if (index >= 0) { this.busy.set(index, msg); this.drawKey(index); } };
+		const view = this.cur;
+		const busy = (msg: string) => { if (index >= 0) this.inView(view, () => { view.busy.set(index, msg); this.drawKey(index); }); };
 		this.setupRunning = tgt.id;
 		this.log(`setup ${tgt.id}: start${existing ? " (update)" : ""}`);
 		try {
@@ -820,7 +924,7 @@ export class Engine extends EventEmitter {
 
 			const { zones } = normalize(this.config);
 			const keySlots = KEY_COUNT - zones.system.keys.length;
-			const dialSlots = Math.max(1, DIAL_COUNT - zones.system.dials.length);
+			const dialSlots = Math.max(1, PLUS.dials - zones.system.dials.length);
 			const { system, prompt } = buildPrompt({ target: tgt, entries, slots: { keys: keySlots, dials: dialSlots }, iconHints: ICON_HINTS, platform, digest, existing });
 			const primary = this.settings.setupLlm ?? this.llm;
 			const fallback = this.settings.fallbackLlm && this.settings.fallbackLlm !== primary ? this.settings.fallbackLlm : undefined;
@@ -879,9 +983,8 @@ export class Engine extends EventEmitter {
 			return { ok: false, error };
 		} finally {
 			this.setupRunning = null;
-			if (index >= 0) this.busy.delete(index);
-			this.pageMemory.delete(this.contextKey);
-			this.contextKey = "";
+			if (index >= 0) view.busy.delete(index);
+			for (const v of this.views.values()) { v.pageMemory.delete(v.contextKey); v.contextKey = ""; }
 			this.recompute(true);
 			if (this.setupState[tgt.id]?.ok) this.flash(0, "#22C55E", undefined, 900);
 		}
@@ -937,13 +1040,14 @@ export class Engine extends EventEmitter {
 		this.deps.savePrefs({ llm: this.llmOverride });
 		this.log(`LLM provider → ${this.llm}`);
 		this.redrawAll();
-		this.flash(KEY_COUNT - 1, "#22C55E", this.llmName, 1200);
+		this.flash(this.geo.keys - 1, "#22C55E", this.llmName, 1200);
 	}
 
 	private async runLlm(a: { type: "llm" | "claude" } & LlmAction, index: number) {
 		const inputMode = a.input ?? "selection";
 		const provider = a.provider ?? this.llm;
-		if (index >= 0) { this.busy.set(index, `asking ${providerName(this.settings, provider)}`); this.drawKey(index); }
+		const view = this.cur;
+		if (index >= 0) { view.busy.set(index, `asking ${providerName(this.settings, provider)}`); this.drawKey(index); }
 		try {
 			let input = "";
 			if (inputMode === "selection") input = (await this.os.copySelection()) || (await this.os.getClipboard());
@@ -972,7 +1076,7 @@ export class Engine extends EventEmitter {
 				if (index >= 0) this.flash(index, "#22C55E", "Copied", 1200);
 			}
 		} finally {
-			if (index >= 0) { this.busy.delete(index); this.drawKey(index); }
+			if (index >= 0) this.inView(view, () => { view.busy.delete(index); this.drawKey(index); });
 		}
 	}
 }

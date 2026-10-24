@@ -11,7 +11,8 @@ import { chordToAppleScript, parseAppName, prettyBundle } from "../src/platform/
 import { axToChord, menuClickScript, parseMenuDump, usefulEntries } from "../src/menus";
 import { loadIcons, renderDial, renderKey } from "../src/render";
 import { htmlToText, rankHits, type Digest } from "../src/research";
-import { composeSmart, glob, inTime, levelOf, resolve, template, DEFAULT_ZONES } from "../src/resolve";
+import { composeSmart, glob, inTime, levelOf, resolve, template, zonesFor, DEFAULT_ZONES, PLUS } from "../src/resolve";
+import { deviceOf } from "../src/hosts/elgato/actions";
 import { memoryStore, MissingSecretError, withSecrets } from "../src/secrets";
 import { buildPrompt, chordKey, planToLayout, targetForApp, targetForSite } from "../src/setup";
 import type { Action, Config, Context, LayoutDef } from "../src/types";
@@ -466,4 +467,59 @@ test("a site page without dials borrows the browser's", () => {
 	const r = resolve(cfg, ctx({ bundleId: "com.google.Chrome", url: "https://studio.youtube.com/x" }), { page: "sub" });
 	assert.deepEqual(dialLabels(r), ["Tabs", "Scroll", "Zoom", "Volume"]);
 	assert.equal(r.dialOwners[0]?.id, "app.browsers");
+});
+
+// ---------- devices ----------
+const yt = { bundleId: "com.google.Chrome", app: "Chrome", url: "https://www.youtube.com/watch?v=1", title: "", sub: "", flags: {}, now: new Date("2026-10-24T12:00:00") } as Context;
+const XL = { keys: 32, dials: 0, cols: 8, rows: 4, kind: "xl" };
+const MINI = { keys: 6, dials: 0, cols: 3, rows: 2, kind: "mini" };
+const MK2 = { keys: 15, dials: 0, cols: 5, rows: 3, kind: "mk2" };
+
+test("zones for every deck: + keeps its zones; others split sub/app/system in reading order", () => {
+	assert.deepEqual(zonesFor(PLUS), DEFAULT_ZONES);
+	const xl = zonesFor(XL);
+	assert.deepEqual(xl.system.keys, [23, 24, 25, 26, 27, 28, 29, 30]);
+	assert.equal(xl.sub.keys.length, 12);
+	assert.ok(xl.app.keys.includes(31), "the last key (page key) shows app keys when there's one page");
+	const studio = zonesFor({ keys: 32, dials: 2, cols: 16, rows: 2 });
+	assert.deepEqual([studio.sub.dials, studio.app.dials, studio.system.dials], [[0], [], [1]]);
+	const plusXl = zonesFor({ keys: 36, dials: 6, cols: 9, rows: 4 });
+	assert.deepEqual([plusXl.sub.dials, plusXl.app.dials, plusXl.system.dials], [[0, 1, 2], [3, 4], [5]]);
+	assert.deepEqual(deviceOf({ id: "d", type: 13, size: { columns: 9, rows: 4 } }), { id: "d", name: undefined, kind: "plusxl", cols: 9, rows: 4, keys: 36, dials: 6 });
+});
+
+test("bigger decks show more at once (extra pages flow onto the smart page); smaller ones re-flow", () => {
+	const all = loaded.config!;
+	const plus = resolve(all, yt);
+	const xl = resolve(all, yt, { geometry: XL });
+	assert.equal(xl.keys.length, 32);
+	const shown = (r: typeof xl) => r.keys.filter(Boolean).map((k) => k!.label);
+	assert.ok(shown(xl).length > shown(plus).length, "XL shows more keys");
+	assert.ok(shown(xl).includes("Pin Tab"), "browser's Tabs page appears on the XL smart page");
+	assert.equal(xl.keys[23]?.label, plus.keys[7]?.label, "AI key leads the system row");
+	const mini = resolve(all, yt, { geometry: MINI });
+	assert.equal(mini.keys.length, 6);
+	assert.equal(mini.dials.length, 0);
+	const mk2App = resolve(all, yt, { geometry: MK2, page: "app" });
+	assert.equal(mk2App.keys.filter(Boolean).length > 5, true);
+	assert.equal(new Set(mk2App.keys.filter(Boolean).map((k) => k!.label)).size, mk2App.keys.filter(Boolean).length, "no key twice");
+});
+
+test("engine: two decks keep their own pages; a deck without dials gets a page key", () => {
+	const { e } = rig(loaded.config!);
+	const xlImages = new Map<number, string>();
+	for (let i = 0; i < 15; i++) e.addKey({ id: `x${i}`, setImage: async (img) => { xlImages.set(i, Buffer.from(img!.split(",")[1], "base64").toString()); }, setTitle: async () => undefined, showAlert: async () => undefined, showOk: async () => undefined } as KeySurface, i, { id: "mk2", ...MK2 });
+	e.updateContext(yt);
+	assert.ok(xlImages.get(14)!.includes("page 1/"), "MK.2 last key pages");
+	e.keyDown(14, "mk2"); e.keyUp(14, "mk2");
+	assert.equal(e.snapshot().device.id, "mk2");
+	assert.equal(e.snapshot().page.index, 1, "MK.2 moved to page 2");
+	e.dialTouch(3, false, 190, "default");
+	assert.equal(e.snapshot().device.id, "default");
+	assert.equal(e.snapshot().page.index, 1, "+ paged on its own");
+	e.dialTouch(3, false, 190, "default");
+	assert.equal(e.snapshot().page.index, 2);
+	e.keyDown(14, "mk2"); e.keyUp(14, "mk2");
+	assert.equal(e.snapshot().page.index, 2, "MK.2 kept its own page (1 → 2)");
+	assert.deepEqual(e.devices().map((d) => d.id).sort(), ["default", "mk2"]);
 });

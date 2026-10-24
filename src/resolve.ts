@@ -10,14 +10,50 @@
  */
 import type { Config, Context, DialDef, KeyDef, Level, LayoutDef, Match, PageInfo, Resolved, Zone } from "./types";
 
+/** Layouts are authored for the Stream Deck + (4×2 keys, 4 dials); other devices get the same layouts re-flowed. */
 export const KEY_COUNT = 8;
 export const DIAL_COUNT = 4;
+export const KEY_MAX = 64;     // Stream Deck Mobile (largest)
+export const DIAL_MAX = 6;     // Stream Deck + XL
+
+export interface Geometry { keys: number; dials: number; cols: number; rows: number; kind?: string }
+export const PLUS: Geometry = { keys: 8, dials: 4, cols: 4, rows: 2, kind: "plus" };
 
 export const DEFAULT_ZONES: Record<"system" | "app" | "sub", Zone> = {
 	sub: { keys: [0, 1, 2, 3], dials: [0, 1] },
 	app: { keys: [4, 5, 6], dials: [2] },
 	system: { keys: [7], dials: [3] },
 };
+
+/** Is this the geometry layouts are written for (so slot numbers keep their meaning)? */
+export const isNative = (g: Geometry) => g.keys === KEY_COUNT && g.cols === 4;
+
+const range = (a: number, b: number) => Array.from({ length: Math.max(0, b - a) }, (_, i) => a + i);
+
+/**
+ * Zones for any device, in reading order: sub first, then app, the system level at the end
+ * (bottom-right, where the AI key and volume live on the +).
+ *   keys: system gets 1 key up to 8 keys, otherwise ¼ of the deck (max 8); sub ≈ half of the rest.
+ *   dials: system gets the last dial; sub ≈ half of the rest.
+ * Devices without dials reserve their last key for page navigation (it shows app keys when there's only one page).
+ */
+export function zonesFor(g: Geometry): Record<"system" | "app" | "sub", Zone> {
+	if (g.keys === KEY_COUNT && g.dials === DIAL_COUNT) return DEFAULT_ZONES;
+	const n = g.keys, nav = g.dials === 0 && n >= 6 ? 1 : 0;
+	const S = n < 4 ? 0 : n <= 8 ? 1 : Math.min(8, Math.ceil(n / 4));
+	const rest = n - S - nav, subN = Math.ceil(rest / 2);
+	const D = g.dials, DS = D >= 2 ? 1 : 0, dSub = Math.ceil((D - DS) / 2);
+	return {
+		sub: { keys: range(0, subN), dials: range(0, dSub) },
+		app: { keys: [...range(subN, rest), ...range(n - nav, n)], dials: range(dSub, D - DS) },
+		system: { keys: range(rest, rest + S), dials: range(D - DS, D) },
+	};
+}
+
+/** Short device name used for per-device zone overrides (settings.deviceZones). */
+export const DEVICE_KINDS: Record<number, string> = { 0: "mk2", 1: "mini", 2: "xl", 3: "mobile", 4: "gkeys", 5: "pedal", 6: "voyager", 7: "plus", 8: "scuf", 9: "neo", 10: "studio", 11: "virtual", 12: "galleon", 13: "plusxl" };
+/** Dial count by device type (the SDK reports the key grid, not the dials). */
+export const DIALS_BY_TYPE: Record<number, number> = { 7: 4, 10: 2, 12: 2, 13: 6 };
 
 const arr = <T>(v: T | T[] | undefined): T[] => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -90,9 +126,11 @@ export function levelOf(l: LayoutDef): Level {
 }
 
 /** Folds the legacy `pinned` block into a system layout, and fills in zones. */
-export function normalize(cfg: Config): { layouts: LayoutDef[]; zones: Record<"system" | "app" | "sub", Zone> } {
+export function normalize(cfg: Config, g: Geometry = PLUS): { layouts: LayoutDef[]; zones: Record<"system" | "app" | "sub", Zone> } {
 	const layouts = [...cfg.layouts];
-	const zones = { ...DEFAULT_ZONES, ...cfg.settings?.zones } as Record<"system" | "app" | "sub", Zone>;
+	const custom = g.keys === KEY_COUNT && g.dials === DIAL_COUNT ? cfg.settings?.zones : undefined;
+	const perDevice = cfg.settings?.deviceZones?.[g.kind ?? ""] ?? cfg.settings?.deviceZones?.[`${g.cols}x${g.rows}`];
+	const zones = { ...zonesFor(g), ...custom, ...perDevice } as Record<"system" | "app" | "sub", Zone>;
 	const hasSystem = layouts.some((l) => levelOf(l) === "system");
 	if (!hasSystem && cfg.pinned) {
 		const keyIdx = Object.keys(cfg.pinned.keys ?? {}).map(Number).sort((a, b) => a - b);
@@ -144,7 +182,7 @@ function positional<T>(n: number, ...sources: ((T | null)[] | undefined)[]): (T 
 export function applied(l: LayoutDef, modes: Record<string, string>): { keys: (KeyDef | null)[]; dials: (DialDef | null)[] } {
 	const m = activeMode(l, modes);
 	const md = m ? l.modes![m] : undefined;
-	return { keys: positional<KeyDef>(KEY_COUNT, l.keys, md?.keys), dials: positional<DialDef>(DIAL_COUNT, l.dials, md?.dials) };
+	return { keys: positional<KeyDef>(KEY_MAX, l.keys, md?.keys), dials: positional<DialDef>(DIAL_MAX, l.dials, md?.dials) };
 }
 
 type Slots<T> = { items: (T | null)[]; owners: (LayoutDef | null)[] };
@@ -185,15 +223,24 @@ export function composeSmart<T>(n: number, kind: "keys" | "dials", levels: Parti
 	return out;
 }
 
-/** Full page of one layout (positional) with the system zone kept, so the AI key and volume never move. */
-function fullPage<T>(n: number, own: (T | null)[], owner: LayoutDef, sys: (T | null)[], sysOwner: LayoutDef | undefined, sysZone: number[], keepSystem: boolean): Slots<T> {
+/** Lays a layout's items onto n slots: by slot number on the device they were written for, else in order around `reserved`. */
+function fit<T>(n: number, own: (T | null)[], native: boolean, reserved: number[]): (T | null)[] {
+	if (native) return positional<T>(n, own);
+	const out: (T | null)[] = Array(n).fill(null);
+	const items = own.filter((x): x is T => !!x);
+	range(0, n).filter((i) => !reserved.includes(i)).forEach((i, k) => { if (items[k] !== undefined) out[i] = items[k]; });
+	return out;
+}
+
+/** Full page of one layout with the system zone kept, so the AI key and volume never move. */
+function fullPage<T>(n: number, ownRaw: (T | null)[], owner: LayoutDef, sys: (T | null)[], sysOwner: LayoutDef | undefined, sysZone: number[], keepSystem: boolean, native: boolean): Slots<T> {
+	const sysItems = keepSystem && sysOwner ? sys.filter((x): x is T => !!x) : [];
+	const z = sysZone.filter((i) => i < n);
+	const own = fit(n, ownRaw, native, z.slice(0, sysItems.length));
 	const out: Slots<T> = { items: [...own], owners: own.map((x) => (x ? owner : null)) };
-	if (keepSystem && sysOwner) {
-		const sysItems = sys.filter((x): x is T => !!x);
-		sysZone.filter((i) => i < n).forEach((i, k) => {
-			if (sysItems[k] !== undefined) { out.items[i] = sysItems[k]; out.owners[i] = sysOwner; }
-		});
-	}
+	z.forEach((i, k) => {
+		if (sysItems[k] !== undefined) { out.items[i] = sysItems[k]; out.owners[i] = sysOwner!; }
+	});
 	return out;
 }
 
@@ -201,10 +248,13 @@ export interface ResolveOptions {
 	forcedId?: string | null;                  // pin one layout at its level
 	modes?: Record<string, string>;
 	page?: number | string;                    // index or page id
+	geometry?: Geometry;                       // the device being drawn (default: Stream Deck +)
 }
 
 export function resolve(cfg: Config, ctx: Context, opts: ResolveOptions = {}): Resolved {
-	const { layouts, zones } = normalize(cfg);
+	const g = opts.geometry ?? PLUS;
+	const NK = g.keys, ND = g.dials, natK = isNative(g), natD = ND === DIAL_COUNT;
+	const { layouts, zones } = normalize(cfg, g);
 	const levels: Partial<Record<Level, LayoutDef>> = {};
 	const forced = opts.forcedId ? layouts.find((l) => l.id === opts.forcedId) : undefined;
 	levels.system = forced && levelOf(forced) === "system" ? forced : pick(layouts, ctx, "system");
@@ -222,41 +272,45 @@ export function resolve(cfg: Config, ctx: Context, opts: ResolveOptions = {}): R
 	const a = (l?: LayoutDef) => (l ? applied(l, modes) : undefined);
 	const sys = a(levels.system), app = a(levels.app), sub = a(levels.sub), tk = a(levels.takeover);
 	const sysZ = zones.system;
+	// Bigger decks show a layout's extra pages on the smart page too.
+	const more = <T>(l: LayoutDef | undefined, base: (T | null)[] | undefined, kind: "keys" | "dials", cap: number): (T | null)[] | undefined =>
+		!l || !base ? base : cap > (kind === "keys" ? KEY_COUNT : DIAL_COUNT) ? [...base, ...(l.pages ?? []).flatMap((p) => (p[kind] ?? []) as (T | null)[])] : base;
 
 	const pages: { info: PageInfo; keys: Slots<KeyDef>; dials: Slots<DialDef> }[] = [];
 	if (levels.takeover && tk) {
 		const keep = levels.takeover.pinned !== false;
 		pages.push({ info: { id: "smart", name: levels.takeover.name ?? levels.takeover.id, level: "smart" },
-			keys: fullPage(KEY_COUNT, tk.keys, levels.takeover, sys?.keys ?? [], levels.system, sysZ.keys, keep),
-			dials: fullPage(DIAL_COUNT, tk.dials, levels.takeover, sys?.dials ?? [], levels.system, sysZ.dials, keep) });
+			keys: fullPage(NK, tk.keys, levels.takeover, sys?.keys ?? [], levels.system, sysZ.keys, keep, natK),
+			dials: fullPage(ND, tk.dials, levels.takeover, sys?.dials ?? [], levels.system, sysZ.dials, keep, natD) });
 	} else {
 		pages.push({ info: { id: "smart", name: "Smart", level: "smart" },
-			keys: composeSmart(KEY_COUNT, "keys", levels, { system: sys?.keys, app: app?.keys, sub: sub?.keys }, zones),
-			dials: composeSmart(DIAL_COUNT, "dials", levels, { system: sys?.dials, app: app?.dials, sub: sub?.dials }, zones) });
+			keys: composeSmart(NK, "keys", levels, { system: sys?.keys, app: more(levels.app, app?.keys, "keys", NK), sub: more(levels.sub, sub?.keys, "keys", NK) }, zones),
+			dials: composeSmart(ND, "dials", levels, { system: sys?.dials, app: more(levels.app, app?.dials, "dials", ND), sub: more(levels.sub, sub?.dials, "dials", ND) }, zones) });
 		for (const lv of ["sub", "app"] as const) {
 			const l = levels[lv], ap = lv === "sub" ? sub : app;
 			if (!l || !ap) continue;
 			// A site/sub layout without dials borrows the app's (e.g. browser tabs/scroll/zoom).
 			const ownDials = ap.dials.some(Boolean) || lv !== "sub" || !app || !levels.app;
 			pages.push({ info: { id: lv, name: l.name ?? l.id, level: lv },
-				keys: fullPage(KEY_COUNT, ap.keys, l, sys?.keys ?? [], levels.system, sysZ.keys, true),
-				dials: fullPage(DIAL_COUNT, ownDials ? ap.dials : app!.dials, ownDials ? l : levels.app!, sys?.dials ?? [], levels.system, sysZ.dials, true) });
+				keys: fullPage(NK, ap.keys, l, sys?.keys ?? [], levels.system, sysZ.keys, true, natK),
+				dials: fullPage(ND, ownDials ? ap.dials : app!.dials, ownDials ? l : levels.app!, sys?.dials ?? [], levels.system, sysZ.dials, true, natD) });
 			for (const p of l.pages ?? []) {
 				pages.push({ info: { id: `${l.id}:${p.name}`, name: p.name, level: lv },
-					keys: fullPage(KEY_COUNT, positional<KeyDef>(KEY_COUNT, p.keys), l, sys?.keys ?? [], levels.system, sysZ.keys, true),
-					dials: fullPage(DIAL_COUNT, positional<DialDef>(DIAL_COUNT, p.dials), l, sys?.dials ?? [], levels.system, sysZ.dials, true) });
+					keys: fullPage(NK, positional<KeyDef>(KEY_MAX, p.keys), l, sys?.keys ?? [], levels.system, sysZ.keys, true, natK),
+					dials: fullPage(ND, positional<DialDef>(DIAL_MAX, p.dials), l, sys?.dials ?? [], levels.system, sysZ.dials, true, natD) });
 			}
 		}
 	}
 	if (levels.system && sys) {
 		const own = (x: (KeyDef | DialDef | null)[]) => x.filter(Boolean).length;
-		if (own(sys.keys) > sysZ.keys.length || own(sys.dials) > sysZ.dials.length) {
+		const sk = fit<KeyDef>(NK, sys.keys, natK, []), sd = fit<DialDef>(ND, sys.dials, natD, []);
+		if (own(sys.keys) > sysZ.keys.filter((i) => i < NK).length || own(sys.dials) > sysZ.dials.filter((i) => i < ND).length) {
 			pages.push({ info: { id: "system", name: levels.system.name ?? "System", level: "system" },
-				keys: { items: sys.keys, owners: sys.keys.map((x) => (x ? levels.system! : null)) },
-				dials: { items: sys.dials, owners: sys.dials.map((x) => (x ? levels.system! : null)) } });
+				keys: { items: sk, owners: sk.map((x) => (x ? levels.system! : null)) },
+				dials: { items: sd, owners: sd.map((x) => (x ? levels.system! : null)) } });
 		}
 		for (const p of levels.system.pages ?? []) {
-			const keys = positional<KeyDef>(KEY_COUNT, p.keys), dials = positional<DialDef>(DIAL_COUNT, p.dials);
+			const keys = fit<KeyDef>(NK, positional<KeyDef>(KEY_MAX, p.keys), natK, []), dials = fit<DialDef>(ND, positional<DialDef>(DIAL_MAX, p.dials), natD, []);
 			pages.push({ info: { id: `${levels.system.id}:${p.name}`, name: p.name, level: "system" },
 				keys: { items: keys, owners: keys.map((x) => (x ? levels.system! : null)) },
 				dials: { items: dials, owners: dials.map((x) => (x ? levels.system! : null)) } });

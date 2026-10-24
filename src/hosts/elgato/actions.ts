@@ -4,14 +4,22 @@ import {
 } from "@elgato/streamdeck";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type JsonObject = { [key: string]: any };
-import type { Engine } from "../../engine";
+import type { DeviceInfo, Engine } from "../../engine";
+import { DEVICE_KINDS, DIALS_BY_TYPE } from "../../resolve";
+
+/** The deck an action lives on, as the engine sees it. */
+export function deviceOf(d: { id: string; name?: string; type?: number; size?: { columns: number; rows: number } }): DeviceInfo {
+	const cols = d.size?.columns || 4, rows = d.size?.rows || 2;
+	const type = d.type ?? 7;
+	return { id: d.id, name: d.name, kind: DEVICE_KINDS[type] ?? `type${type}`, cols, rows, keys: cols * rows, dials: DIALS_BY_TYPE[type] ?? 0 };
+}
 
 type S = JsonObject;
 
 /** One instance per physical key. Its slot is derived from its position, so you just fill every key with it. */
 @action({ UUID: "com.var.contextdeck.key" })
 export class ContextKey extends SingletonAction<S> {
-	private slots = new Map<string, number>();
+	private slots = new Map<string, { index: number; device: string }>();
 	constructor(private engine: Engine) { super(); }
 
 	override onWillAppear(ev: WillAppearEvent<S>) {
@@ -20,35 +28,37 @@ export class ContextKey extends SingletonAction<S> {
 		if (!c) return;
 		const cols = ev.action.device.size?.columns || 4;
 		const index = c.row * cols + c.column;
-		this.slots.set(ev.action.id, index);
 		const a = ev.action;
-		this.engine.addKey({ id: a.id, setImage: (i) => a.setImage(i), setTitle: (t) => a.setTitle(t), showAlert: () => a.showAlert(), showOk: () => a.showOk() }, index);
+		const dev = deviceOf(a.device as never);
+		this.slots.set(a.id, { index, device: dev.id });
+		this.engine.addKey({ id: a.id, setImage: (i) => a.setImage(i), setTitle: (t) => a.setTitle(t), showAlert: () => a.showAlert(), showOk: () => a.showOk() }, index, dev);
 	}
 	override onWillDisappear(ev: WillDisappearEvent<S>) { this.engine.removeKey(ev.action.id); this.slots.delete(ev.action.id); }
-	override onKeyDown(ev: KeyDownEvent<S>) { const i = this.slots.get(ev.action.id); if (i !== undefined) this.engine.keyDown(i); }
-	override onKeyUp(ev: KeyUpEvent<S>) { const i = this.slots.get(ev.action.id); if (i !== undefined) this.engine.keyUp(i); }
+	override onKeyDown(ev: KeyDownEvent<S>) { const s = this.slots.get(ev.action.id); if (s) this.engine.keyDown(s.index, s.device); }
+	override onKeyUp(ev: KeyUpEvent<S>) { const s = this.slots.get(ev.action.id); if (s) this.engine.keyUp(s.index, s.device); }
 }
 
-/** One instance per dial (Stream Deck +). Draws its whole touch-strip segment. */
+/** One instance per dial (Stream Deck +, + XL, Studio, Galleon). Draws its whole touch-strip segment where there is one. */
 @action({ UUID: "com.var.contextdeck.dial" })
 export class ContextDial extends SingletonAction<S> {
-	private slots = new Map<string, number>();
+	private slots = new Map<string, { index: number; device: string }>();
 	constructor(private engine: Engine) { super(); }
 
 	override onWillAppear(ev: WillAppearEvent<S>) {
 		if (!ev.action.isDial()) return;
 		const index = ev.action.coordinates.column;
-		this.slots.set(ev.action.id, index);
 		const a = ev.action;
+		const dev = deviceOf(a.device as never);
+		this.slots.set(a.id, { index, device: dev.id });
 		this.engine.addDial({
 			id: a.id,
 			setFeedback: (f) => a.setFeedback(f as never),
 			setTriggerDescription: (d) => a.setTriggerDescription(d),
 			showAlert: () => a.showAlert(),
-		}, index);
+		}, index, dev);
 	}
 	override onWillDisappear(ev: WillDisappearEvent<S>) { this.engine.removeDial(ev.action.id); this.slots.delete(ev.action.id); }
-	override onDialRotate(ev: DialRotateEvent<S>) { const i = this.slots.get(ev.action.id); if (i !== undefined) void this.engine.dialRotate(i, ev.payload.ticks); }
-	override onDialDown(ev: DialDownEvent<S>) { const i = this.slots.get(ev.action.id); if (i !== undefined) this.engine.dialPress(i); }
-	override onTouchTap(ev: TouchTapEvent<S>) { const i = this.slots.get(ev.action.id); if (i !== undefined) this.engine.dialTouch(i, ev.payload.hold, ev.payload.tapPos?.[0]); }
+	override onDialRotate(ev: DialRotateEvent<S>) { const s = this.slots.get(ev.action.id); if (s) void this.engine.dialRotate(s.index, ev.payload.ticks, s.device); }
+	override onDialDown(ev: DialDownEvent<S>) { const s = this.slots.get(ev.action.id); if (s) this.engine.dialPress(s.index, s.device); }
+	override onTouchTap(ev: TouchTapEvent<S>) { const s = this.slots.get(ev.action.id); if (s) this.engine.dialTouch(s.index, ev.payload.hold, ev.payload.tapPos?.[0], s.device); }
 }
