@@ -3,3 +3,4 @@ dist/
 *.sdPlugin/bin/
 *.sdPlugin/mcp/
 *.sdPlugin/logs/
+out/
