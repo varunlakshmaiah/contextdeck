@@ -32,6 +32,8 @@ import type { LayoutDef, OverlaySpec } from "./types";
  *   DELETE /secrets/:name
  *   POST /secrets/refresh              re-read the credential store
  *   GET  /menus[?bundleId=..&all=1]    the front app's menu items with real shortcuts
+ *   GET  /elgato/tools[?refresh]       actions on the Stream Deck app's "MCP Actions" profile (via @elgato/mcp-server)
+ *   POST /elgato/run {"tool","args"}   trigger one
  *   GET  /llm                          providers, which one is in use
  *   POST /llm/use    {"provider":"openrouter"} | {"provider":null}
  *   POST /llm/test   {"provider":"ollama"}     round-trip test (latency + reply)
@@ -128,6 +130,17 @@ export function startApi(engine: Engine, port: number, token: string) {
 				}
 				for (const n of Object.keys(out)) out[n].stored = !!(await engine.deps.secrets.get(n).catch(() => undefined));
 				return send(res, 200, { secrets: out, missing: Object.entries(out).filter(([, v]) => !v.stored).map(([k]) => k) });
+			}
+			if (route === "GET /elgato/tools") {
+				if (!engine.elgato.available) return send(res, 200, { ok: false, available: false, error: process.platform === "linux" ? "Elgato's MCP server needs the Stream Deck app (macOS or Windows)" : "turned off in settings.elgato" });
+				try { return send(res, 200, { ok: true, tools: await engine.elgato.listTools(url.searchParams.has("refresh")) }); }
+				catch (e) { return send(res, 200, { ok: false, error: (e as Error).message }); }
+			}
+			if (route === "POST /elgato/run") {
+				const b = body as { tool?: string; args?: Record<string, unknown> };
+				if (!b.tool) return send(res, 400, { ok: false, error: "tool is required" });
+				try { return send(res, 200, { ok: true, result: await engine.elgato.call(b.tool, b.args ?? {}) }); }
+				catch (e) { return send(res, 200, { ok: false, error: (e as Error).message }); }
 			}
 			if (route === "GET /llm") {
 				return send(res, 200, {

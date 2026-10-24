@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { deleteLayout, LAYOUTS_DIR, writeLayout } from "./config";
 import { evaluate, intervalMs, type InfoResult } from "./info";
 import { askLLM, configuredProviders, parseChoices, providerName, type AskOptions } from "./llm";
+import { ElgatoBridge } from "./elgato";
 import { usefulEntries, type MenuEntry } from "./menus";
 import { platform, setCmdKey, type Platform as OsPlatform } from "./platform";
 import { loadIcons, renderDial, renderKey, toDataUrl } from "./render";
@@ -182,6 +183,9 @@ export class Engine extends EventEmitter {
 		super();
 		for (const v of this.views.values()) v.resolved = resolve(this.config, this.ctx, { geometry: v.geo });
 	}
+
+	/** Official plugins' actions, through Elgato's MCP server. */
+	elgato = new ElgatoBridge(() => this.settings.elgato ?? {}, (m) => this.log(m));
 
 	/** The OS adapter (swap with setPlatform() in tests). */
 	get os(): OsPlatform { return platform(); }
@@ -793,6 +797,11 @@ export class Engine extends EventEmitter {
 				}
 				if (a.key === "__providers") return this.showProviderPicker();
 				return this.setState(a.key, a.value);
+			}
+			case "elgato": {
+				const out = await this.elgato.call(a.tool, a.args ?? {});
+				if (index >= 0) this.flash(index, "#22C55E", out ? out.slice(0, 14) : undefined, 900);
+				return;
 			}
 			case "sequence":
 				for (const s of a.steps) {

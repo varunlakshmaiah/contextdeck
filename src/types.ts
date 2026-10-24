@@ -1,3 +1,4 @@
+import type { ElgatoSettings } from "./elgato";
 import type { LlmSettings } from "./llm";
 
 /**
@@ -47,7 +48,8 @@ type ActionBase =
 	| { type: "deckMenu" }                                 // ContextDeck's own menu on the keys
 	| { type: "secretSet"; name: string }                  // prompt for a secret and store it in the Keychain
 	| { type: "reload" }
-	| { type: "editLayout"; layout?: string };             // open a layout's file (default: the key's layout)
+	| { type: "editLayout"; layout?: string }
+	| { type: "elgato"; tool: string; args?: Record<string, unknown> };  // an action from the Stream Deck app's "MCP Actions" profile (official plugins)             // open a layout's file (default: the key's layout)
 
 export interface LlmAction {
 	prompt: string;
@@ -210,6 +212,7 @@ export interface Settings extends LlmSettings {
 	deviceZones?: Record<string, Partial<Record<"system" | "app" | "sub", Zone>>>;  // per device: "xl", "mk2", "mini", "neo", "studio", "plusxl", "mobile" … or "<cols>x<rows>"
 	research?: ResearchSettings;
 	secrets?: Record<string, SecretDecl>;   // global secret declarations (layouts can declare their own)
+	elgato?: ElgatoSettings;                // bridge to Elgato's MCP server (official plugins' actions)
 }
 
 export interface Config {

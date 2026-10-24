@@ -568,3 +568,19 @@ test("Linux: xprop parsing, xdotool key names, app names", () => {
 	assert.equal(prettyName("google-chrome"), "Google Chrome");
 	assert.equal(prettyName("org.gnome.Nautilus"), "Nautilus");
 });
+
+test("Elgato bridge: list and run official plugins' actions through an MCP server", async () => {
+	const { ElgatoBridge, elgatoCommand } = await import("../src/elgato");
+	assert.deepEqual(elgatoCommand({}, "win32"), { command: "cmd.exe", args: ["/d", "/s", "/c", "npx", "-y", "@elgato/mcp-server@latest"] });
+	assert.equal(elgatoCommand({}, "darwin").args[1], "exec 'npx' '-y' '@elgato/mcp-server@latest'");
+	assert.equal(new ElgatoBridge(() => ({}), undefined, "linux").available, false);
+	const b = new ElgatoBridge(() => ({ shell: false, command: [process.execPath, "--import", "tsx", "test/fake-elgato.ts"] }), undefined, "darwin");
+	try {
+		assert.deepEqual((await b.listTools()).map((t) => t.name), ["obs__start_recording", "hue__scene"]);
+		assert.equal(await b.call("hue__scene", { scene: "Edit bay" }), "scene Edit bay");
+		const { e } = rig();
+		e.elgato = b;
+		await e.exec({ type: "elgato", tool: "obs__start_recording" }, 2);
+		assert.equal(e.snapshot().keys.length, 8);
+	} finally { await b.stop(); }
+});
