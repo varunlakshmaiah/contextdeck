@@ -9,6 +9,9 @@ import type { LayoutDef, OverlaySpec } from "./types";
 /**
  * Local control API — 127.0.0.1 only, bearer token from ~/.contextdeck/token.
  *
+ *   POST /pair       {"client":"Chrome"}  (no token) asks on the deck; returns the token if you press Allow
+ *   POST /context/browser {"url","title","browser","focused","incognito"}  from the browser extension
+ *   GET  /ui                            the ContextDeck app (local web UI; token in the URL fragment)
  *   GET  /status                       current layout, mode, context, state, key labels
  *   GET  /config                       the full layouts.json
  *   PUT  /layouts/:id                  create/replace one layout (validated, hot-reloads)
@@ -34,15 +37,44 @@ import type { LayoutDef, OverlaySpec } from "./types";
  *   POST /llm/test   {"provider":"ollama"}     round-trip test (latency + reply)
  */
 export function startApi(engine: Engine, port: number, token: string) {
+	let pairing = false;
 	const server = createServer(async (req, res) => {
 		try {
-			if (req.headers.authorization !== `Bearer ${token}`) return send(res, 401, { error: "unauthorized" });
+			// The browser extension calls from its own origin; nothing else may (no web page can read the API).
+			// DNS-rebinding guard: only answer to our own host names.
+			if (!/^(127\.0\.0\.1|localhost)(:\d+)?$/.test(String(req.headers.host ?? ""))) return send(res, 403, { error: "host not allowed" });
+			const origin = String(req.headers.origin ?? "");
+			if (/^(chrome|moz|safari-web)-extension:\/\//.test(origin)) {
+				res.setHeader("access-control-allow-origin", origin);
+				res.setHeader("access-control-allow-headers", "authorization, content-type");
+				res.setHeader("access-control-allow-methods", "GET, POST, PUT, DELETE");
+				res.setHeader("vary", "origin");
+			} else if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
+				return send(res, 403, { error: "origin not allowed" });
+			}
+			if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
 			const url = new URL(req.url ?? "/", "http://localhost");
+			if (req.method === "GET" && (url.pathname === "/ui" || url.pathname.startsWith("/ui/"))) return serveUi(res, url.pathname);
+			if (req.method === "POST" && url.pathname === "/pair") {
+				if (pairing) return send(res, 409, { ok: false, error: "Another pairing request is waiting on the deck" });
+				const client = String(((await readJson(req)) as { client?: string }).client ?? "A client").replace(/[^\w .()-]/g, "").slice(0, 40) || "A client";
+				pairing = true;
+				try {
+					const ok = await engine.requestPair(client);
+					return send(res, ok ? 200 : 403, ok ? { ok: true, token } : { ok: false, error: "Denied on the deck" });
+				} finally { pairing = false; }
+			}
+			if (req.headers.authorization !== `Bearer ${token}`) return send(res, 401, { error: "unauthorized" });
 			const body = req.method === "GET" || req.method === "DELETE" ? {} : await readJson(req);
 			const route = `${req.method} ${url.pathname}`;
 			const layoutMatch = /^\/layouts\/([\w.-]+)$/.exec(url.pathname);
 
 			if (route === "GET /status") return send(res, 200, engine.snapshot());
+			if (route === "POST /context/browser") {
+				const b = body as { url?: string; title?: string; browser?: string; focused?: boolean; incognito?: boolean };
+				engine.setBrowserReport({ url: String(b.url ?? "").slice(0, 2000), title: String(b.title ?? "").slice(0, 300), browser: b.browser ? String(b.browser).slice(0, 40) : undefined, focused: b.focused !== false, incognito: !!b.incognito });
+				return send(res, 200, { ok: true });
+			}
 			if (route === "GET /config") return send(res, 200, engine.config);
 			if (layoutMatch && req.method === "PUT") {
 				const layout = { ...(body as unknown as LayoutDef), id: layoutMatch[1] };
@@ -187,6 +219,11 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
 		req.on("end", () => { try { resolve(data ? JSON.parse(data) : {}); } catch { reject(new Error("invalid JSON body")); } });
 		req.on("error", reject);
 	});
+}
+
+function serveUi(res: ServerResponse, _path: string) {
+	res.writeHead(404, { "content-type": "text/plain" });
+	res.end("UI not built");
 }
 
 function send(res: ServerResponse, status: number, body: unknown) {

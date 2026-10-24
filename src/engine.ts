@@ -16,6 +16,8 @@ export interface KeySurface { id: string; setImage(img?: string): Promise<void>;
 export interface DialSurface { id: string; setFeedback(f: Record<string, unknown>): Promise<void>; setTriggerDescription(d: Record<string, string>): Promise<void>; showAlert(): Promise<void> }
 
 /** A physical (or virtual) deck. Each one gets its own page, page memory and pressed/busy state. */
+export interface BrowserReport { url: string; title: string; browser?: string; focused: boolean; incognito?: boolean; at: number }
+
 export interface DeviceInfo extends Geometry { id: string; name?: string }
 
 class View {
@@ -86,7 +88,7 @@ export class Engine extends EventEmitter {
 	reloadConfig: () => void = () => undefined;
 	log: (msg: string) => void = () => undefined;
 	onDiag: () => void = () => undefined;
-	diag: { detector: string; detectErrors: string[]; urlError: string; lastDetect: string } = { detector: "", detectErrors: [], urlError: "", lastDetect: "" };
+	diag: { detector: string; detectErrors: string[]; urlError: string; lastDetect: string; tab?: string } = { detector: "", detectErrors: [], urlError: "", lastDetect: "" };
 
 	private keys = new Map<string, { surface: KeySurface; index: number; device: string }>();
 	private dials = new Map<string, { surface: DialSurface; index: number; device: string }>();
@@ -233,15 +235,46 @@ export class Engine extends EventEmitter {
 	}
 	stop() { clearTimeout(this.pollTimer); clearTimeout(this.infoTimer); }
 
+	/** Latest report from the ContextDeck browser extension (exact URL + title, any OS). */
+	browserReport?: BrowserReport;
+	setBrowserReport(r: Omit<BrowserReport, "at">) {
+		this.browserReport = { ...r, at: Date.now() };
+		if (this.browsers.includes(this.ctx.bundleId) || r.focused) void this.detect().catch(() => undefined);
+	}
+	private freshReport(): BrowserReport | undefined {
+		const r = this.browserReport;
+		return r && r.focused && Date.now() - r.at < 30 * 60_000 ? r : undefined;
+	}
+
+	/** Pairing: a client (the browser extension) asks for the API token; you allow it on the deck. */
+	async requestPair(client: string, timeoutMs = 60_000): Promise<boolean> {
+		const id = this.showOverlay({
+			title: `Pair ${client}?`,
+			items: [
+				{ label: "Allow", sub: client.slice(0, 14), icon: "check", color: "#22C55E", value: "allow" },
+				{ label: "Deny", icon: "x", color: "#EF4444", value: "deny" },
+			],
+			onPick: "return",
+			timeoutMs,
+		});
+		void this.os.notify(`${client} wants to connect. Press Allow on your Stream Deck.`, "ContextDeck");
+		const r = await this.waitForPick(id, timeoutMs);
+		return r.picked === "allow";
+	}
+
 	async detect() {
 		const front = await this.os.frontmost();
-		let url = "", title = "", urlError = "", sub = "";
+		let url = "", title = "", urlError = "", sub = "", tabVia = "";
 		if (this.browsers.includes(front.bundleId)) {
-			const tab = await this.os.browserTab(front.bundleId).catch((e) => {
-				urlError = ((e as { stderr?: string }).stderr || (e as Error).message).trim().slice(0, 200);
-				return { url: this.ctx.url, title: this.ctx.title };
-			});
-			url = tab.url; title = tab.title;
+			const ext = this.freshReport();
+			if (ext) { url = ext.incognito ? "" : ext.url; title = ext.title; tabVia = "extension"; }
+			else {
+				const tab = await this.os.browserTab(front.bundleId).catch((e) => {
+					urlError = ((e as { stderr?: string }).stderr || (e as Error).message).trim().slice(0, 200);
+					return { url: this.ctx.url, title: this.ctx.title };
+				});
+				url = tab.url; title = tab.title; tabVia = this.os.caps.browserTab ? "os" : "window title";
+			}
 		} else {
 			// Native app: run its layout's probe (if any) to read the sub-context.
 			const appLayout = pick(normalize(this.config).layouts, { ...this.ctx, bundleId: front.bundleId, app: front.app, url: "", title: "", sub: "" }, "app");
@@ -257,7 +290,7 @@ export class Engine extends EventEmitter {
 			}
 		}
 		const changed = front.bundleId !== this.ctx.bundleId || url !== this.ctx.url || front.via !== this.diag.detector || urlError !== this.diag.urlError || sub !== this.ctx.sub;
-		this.diag = { detector: front.via, detectErrors: front.errors, urlError, lastDetect: new Date().toISOString() };
+		this.diag = { detector: front.via, detectErrors: front.errors, urlError, lastDetect: new Date().toISOString(), tab: tabVia };
 		this.updateContext({ bundleId: front.bundleId, app: front.app, url, title, sub });
 		if (changed) {
 			this.drawKey(0);
