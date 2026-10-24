@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ContextDeck</title>
+<style>
+	:root {
+		--bg: #f6f6f7; --panel: #ffffff; --fg: #18181b; --muted: #71717a; --line: #e4e4e7; --soft: #f1f1f3;
+		--accent: #f97316; --accent-fg: #ffffff; --ok: #16a34a; --warn: #b45309; --bad: #dc2626; --deck: #0b0b0d; --deck-line: #26262b;
+		--mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+		color-scheme: light;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) { --bg: #0d0d0f; --panel: #151518; --fg: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --soft: #1c1c20; --warn: #fbbf24; --bad: #f87171; --ok: #4ade80; color-scheme: dark; }
+	}
+	:root[data-theme="dark"] { --bg: #0d0d0f; --panel: #151518; --fg: #f4f4f5; --muted: #a1a1aa; --line: #27272a; --soft: #1c1c20; --warn: #fbbf24; --bad: #f87171; --ok: #4ade80; color-scheme: dark; }
+	* { box-sizing: border-box; }
+	body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+	a { color: var(--accent); }
+	.app { display: grid; grid-template-columns: 210px 1fr; min-height: 100vh; }
+	nav { border-right: 1px solid var(--line); padding: 18px 12px; background: var(--panel); position: sticky; top: 0; height: 100vh; }
+	.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; padding: 0 8px 16px; }
+	.logo { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 6px; }
+	.logo i { background: #fff; border-radius: 1.5px; opacity: .95; }
+	nav button { display: flex; width: 100%; align-items: center; gap: 8px; text-align: left; background: none; border: 0; color: var(--muted); padding: 8px 10px; border-radius: 8px; font: inherit; cursor: pointer; }
+	nav button:hover { background: var(--soft); color: var(--fg); }
+	nav button[aria-current="true"] { background: var(--soft); color: var(--fg); font-weight: 600; }
+	nav .badge { margin-left: auto; }
+	main { padding: 24px; max-width: 1100px; width: 100%; min-width: 0; }
+	h1 { font-size: 20px; margin: 0 0 4px; }
+	h2 { font-size: 14px; margin: 0 0 10px; }
+	.sub { color: var(--muted); margin: 0 0 20px; }
+	.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; min-width: 0; overflow-x: auto; }
+	.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+	.grow { flex: 1; min-width: 0; }
+	.grid2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+	button.btn, .btn { background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 8px; padding: 7px 12px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+	.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); font-weight: 500; }
+	.btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--line); font-weight: 500; }
+	.btn:disabled { opacity: .5; cursor: default; }
+	input, select, textarea { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+	textarea { width: 100%; font-family: var(--mono); font-size: 12.5px; line-height: 1.45; min-height: 420px; resize: vertical; tab-size: 2; }
+	label.f { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+	label.f + input, label.f + select { width: 100%; }
+	.badge { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+	.badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); } .badge.warn { color: var(--warn); } .badge.accent { color: var(--accent); }
+	.muted { color: var(--muted); } .mono { font-family: var(--mono); font-size: 12.5px; }
+	.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+	.chip { border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12.5px; cursor: pointer; }
+	.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+	table { width: 100%; border-collapse: collapse; }
+	td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+	th { font-size: 12px; color: var(--muted); font-weight: 500; }
+	.list { display: flex; flex-direction: column; gap: 2px; max-height: 70vh; overflow: auto; }
+	.list button { display: flex; gap: 8px; align-items: center; text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 8px; color: var(--fg); font: inherit; cursor: pointer; }
+	.list button:hover { background: var(--soft); }
+	.list button[aria-current="true"] { background: var(--soft); font-weight: 600; }
+	.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+	.group { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 10px 8px 4px; }
+	/* deck */
+	#deck { min-width: 0; }
+	.deck { background: var(--deck); border: 1px solid var(--deck-line); border-radius: 18px; padding: 16px; display: inline-flex; flex-direction: column; gap: 12px; max-width: 100%; }
+	.keys { display: grid; gap: 10px; }
+	.keys button { padding: 0; border: 0; background: #000; border-radius: 12px; overflow: hidden; cursor: pointer; aspect-ratio: 1; width: 100%; }
+	.keys img, .dials img { width: 100%; height: 100%; display: block; }
+	.dials { display: grid; gap: 4px; background: #000; border-radius: 10px; overflow: hidden; }
+	.dials img { aspect-ratio: 2 / 1; height: auto; }
+	.deckbar { display: flex; justify-content: space-between; align-items: center; color: #a1a1aa; font-size: 12px; }
+	.deckbar button { background: #1c1c20; color: #e4e4e7; border: 0; border-radius: 6px; padding: 3px 9px; font: inherit; cursor: pointer; }
+	.kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: 13px; }
+	.kv div:nth-child(odd) { color: var(--muted); }
+	.kv div { overflow-wrap: anywhere; }
+	.logs { font-family: var(--mono); font-size: 12px; max-height: 70vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+	.logs div { padding: 2px 0; border-bottom: 1px dashed var(--line); }
+	.toast { position: fixed; bottom: 16px; right: 16px; left: 16px; margin-left: auto; max-width: 420px; background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; z-index: 10; }
+	.toast.show { opacity: 1; transform: none; }
+	.empty { padding: 40px 16px; text-align: center; color: var(--muted); }
+	ol.steps { margin: 0; padding-left: 20px; } ol.steps li { margin: 4px 0; }
+	@media (max-width: 860px) {
+		.app { grid-template-columns: 1fr; }
+		nav { position: sticky; z-index: 5; height: auto; display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+		nav .brand { display: none; }
+		nav button { width: auto; white-space: nowrap; }
+		nav .badge { margin-left: 4px; }
+		main { padding: 16px; }
+		.grid2 { grid-template-columns: minmax(0, 1fr) !important; }
+		textarea { min-height: 300px; }
+	}
+</style>
+</head>
+<body>
+<div class="app">
+	<nav id="nav" aria-label="Sections">
+		<div class="brand"><span class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>ContextDeck</div>
+	</nav>
+	<main id="main"><div class="empty">Connecting…</div></main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+"use strict";
+// ---------- connection ----------
+const hash = new URLSearchParams(location.hash.slice(1));
+let TOKEN = hash.get("token") || "";
+try { if (TOKEN) sessionStorage.setItem("cd.token", TOKEN); else TOKEN = sessionStorage.getItem("cd.token") || ""; } catch {}
+if (location.hash) history.replaceState(null, "", location.pathname);
+
+async function api(method, path, body) {
+	const res = await fetch(path, { method, headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+	const text = await res.text();
+	let data; try { data = JSON.parse(text); } catch { data = text; }
+	if (res.status === 401) throw new Error("Not authorized. Open the app from the deck (hold the AI key → App) or run: deck ui");
+	if (!res.ok && data && data.error) throw new Error(data.error);
+	if (!res.ok && data && data.errors) throw new Error(data.errors.join("\n"));
+	return data;
+}
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const svgUrl = (svg) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+let toastTimer;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600); }
+async function act(fn, ok) { try { const r = await fn(); if (ok) toast(typeof ok === "function" ? ok(r) : ok); return r; } catch (e) { toast(e.message); } }
+
+// ---------- sections ----------
+const SECTIONS = [
+	["deck", "Deck"], ["layouts", "Layouts"], ["secrets", "Keys & secrets"], ["ai", "AI providers"],
+	["elgato", "Stream Deck plugins"], ["browser", "Browser"], ["settings", "Settings"], ["logs", "Logs"],
+];
+let current = "deck", timer, status = null;
+try { current = localStorage.getItem("cd.section") || "deck"; } catch {}
+function renderNav() {
+	const nav = $("#nav");
+	nav.querySelectorAll("button").forEach((b) => b.remove());
+	for (const [id, name] of SECTIONS) {
+		const b = document.createElement("button");
+		b.dataset.section = id;
+		b.setAttribute("aria-current", String(id === current));
+		b.innerHTML = esc(name) + (id === "secrets" && status?.missingSecrets?.length ? ` <span class="badge warn">${status.missingSecrets.length}</span>` : "") + (id === "logs" && status?.configErrors?.length ? ` <span class="badge bad">!</span>` : "");
+		nav.appendChild(b);
+	}
+}
+$("#nav").addEventListener("click", (e) => { const b = e.target.closest("button[data-section]"); if (b) go(b.dataset.section); });
+function go(id) { $("#main").onclick = null; current = id; try { localStorage.setItem("cd.section", id); } catch {} clearInterval(timer); renderNav(); VIEWS[id](); }
+
+// ---------- Deck ----------
+let device = null, lastSig = "";
+async function viewDeck() {
+	$("#main").innerHTML = `<h1>Deck</h1><p class="sub">Live view of what your deck shows. Click a key to press it; Shift-click to hold.</p>
+		<div class="grid2"><div><div id="devices" class="chips" style="margin-bottom:12px"></div><div id="deck"></div></div><div id="ctx"></div></div>`;
+	lastSig = "";
+	const tick = async () => {
+		try {
+			const [r, s] = await Promise.all([api("GET", `/render${device ? `?device=${encodeURIComponent(device)}` : ""}`), api("GET", "/status")]);
+			status = s; renderNav();
+			drawDeck(r); drawContext(s);
+		} catch (e) { $("#deck").innerHTML = `<div class="card empty">${esc(e.message)}</div>`; }
+	};
+	await tick();
+	timer = setInterval(() => { if (!document.hidden) tick(); }, 900);
+}
+function drawDeck(r) {
+	const devs = status?.devices ?? [];
+	$("#devices").innerHTML = devs.length > 1 ? devs.map((d) => `<button class="chip" data-device="${esc(d.id)}" aria-pressed="${d.id === r.device.id}">${esc(d.name)} · ${d.keys} keys${d.dials ? ` · ${d.dials} dials` : ""}</button>`).join("") : "";
+	const sig = JSON.stringify([r.keys, r.dials, r.page]);
+	if (sig === lastSig) return;
+	lastSig = sig;
+	const g = r.device;
+	const width = Math.min(760, g.cols * 96);
+	$("#deck").innerHTML = `<div class="deck" style="width:min(100%, ${width + 34}px)">
+		<div class="keys" style="grid-template-columns:repeat(${g.cols}, 1fr)">${r.keys.map((k, i) => `<button data-key="${i}" aria-label="Key ${i + 1}"><img alt="" src="${svgUrl(k)}"></button>`).join("")}</div>
+		${r.dials.length ? `<div class="dials" style="grid-template-columns:repeat(${r.dials.length}, 1fr)">${r.dials.map((d) => `<img alt="" src="${svgUrl(d)}">`).join("")}</div>` : ""}
+		<div class="deckbar"><button data-page="prev" aria-label="Previous page">‹</button><span>${esc(r.page.name ?? "")} · page ${r.page.index + 1} of ${r.page.of}</span><button data-page="next" aria-label="Next page">›</button></div>
+	</div>`;
+}
+function drawContext(s) {
+	const c = s.context ?? {};
+	$("#ctx").innerHTML = `<div class="card"><h2>In front</h2><div class="kv">
+		<div>App</div><div>${esc(c.app || "—")} <span class="muted mono">${esc(c.bundleId || "")}</span></div>
+		<div>Site</div><div class="mono">${esc(c.url || "—")}</div>
+		${c.sub ? `<div>Sub</div><div>${esc(c.sub)}</div>` : ""}
+		<div>System</div><div>${esc(s.levels?.system ?? "—")}</div>
+		<div>App layout</div><div>${esc(s.levels?.app ?? "—")}</div>
+		<div>Site layout</div><div>${esc(s.levels?.sub ?? "—")}</div>
+		${s.levels?.takeover ? `<div>Takeover</div><div>${esc(s.levels.takeover)}</div>` : ""}
+		<div>AI</div><div>${esc(s.llm?.name ?? "")}</div>
+		<div>Detect</div><div class="muted">${esc(s.diagnostics?.detector ?? "")}${s.diagnostics?.tab ? ` · tab via ${esc(s.diagnostics.tab)}` : ""}</div>
+	</div></div>
+	<div class="card"><h2>Pages</h2><div class="chips">${(s.page?.pages ?? []).map((p, i) => `<button class="chip" data-page="${esc(p)}" aria-pressed="${i === s.page.index}">${esc(p)}</button>`).join("")}</div></div>
+	<div class="card"><div class="row">
+		${s.setup?.target ? `<button class="btn" data-action="setup">✨ Set up ${esc(s.setup.target)}</button>` : ""}
+		<button class="btn ghost" data-action="pin">${s.forcedLayout ? "Unpin layout" : "Pin this layout"}</button>
+		<button class="btn ghost" data-action="reload">Reload files</button>
+	</div>${s.configErrors?.length ? `<p class="muted" style="color:var(--bad);margin:10px 0 0">${s.configErrors.map(esc).join("<br>")}</p>` : ""}</div>`;
+}
+document.addEventListener("click", async (e) => {
+	const key = e.target.closest("[data-key]");
+	if (key) return act(() => api("POST", "/press", { key: Number(key.dataset.key), device: device ?? undefined, hold: e.shiftKey }));
+	const page = e.target.closest("[data-page]");
+	if (page) return act(() => api("POST", "/page", { page: page.dataset.page }));
+	const dev = e.target.closest("[data-device]");
+	if (dev) { device = dev.dataset.device; lastSig = ""; return; }
+	const a = e.target.closest("[data-action]")?.dataset.action;
+	if (a === "setup") { toast("Setting up… this can take a minute."); return act(() => api("POST", "/setup", { force: false }), (r) => r.ok ? `Set up ${r.name}: ${r.keys} keys` : r.error); }
+	if (a === "pin") return act(() => api("POST", "/layout", { id: status?.forcedLayout ? null : status?.layout }));
+	if (a === "reload") return act(() => api("POST", "/reload"), "Reloaded");
+});
+
+// ---------- Layouts ----------
+let selected = null;
+const LEVEL_NAMES = { system: "System", app: "Apps", sub: "Sites & sub-contexts", takeover: "Takeovers" };
+const TEMPLATE = (id) => ({ id, name: "New layout", match: id.startsWith("site.") ? { url: `*://${id.slice(5)}/*` } : {}, keys: [{ label: "Hello", icon: "sparkles", action: { type: "keys", keys: "cmd+k" } }], dials: [] });
+async function viewLayouts() {
+	const { layouts } = await api("GET", "/layouts");
+	const q = $("#lq")?.value ?? "";
+	$("#main").innerHTML = `<h1>Layouts</h1><p class="sub">One file per layout in ~/.contextdeck/layouts. Edits here save to that file and reload instantly.</p>
+		<div class="grid2" style="grid-template-columns:minmax(0,280px) minmax(0,1fr)">
+			<div class="card"><div class="row" style="margin-bottom:8px"><input id="lq" class="grow" placeholder="Filter" value="${esc(q)}"><button class="btn ghost" id="newLayout">New</button></div><div class="list" id="llist"></div></div>
+			<div class="card" id="editor"><div class="empty">Pick a layout to edit it.</div></div>
+		</div>`;
+	const draw = () => {
+		const f = $("#lq").value.toLowerCase();
+		const by = {};
+		for (const l of layouts) if (!f || (l.id + l.name).toLowerCase().includes(f)) (by[l.level] ??= []).push(l);
+		$("#llist").innerHTML = Object.keys(LEVEL_NAMES).filter((lv) => by[lv]).map((lv) => `<div class="group">${LEVEL_NAMES[lv]}</div>` + by[lv].map((l) =>
+			`<button data-layout="${esc(l.id)}" aria-current="${l.id === selected}"><span class="dot" style="background:${esc(l.color || "var(--line)")}"></span><span class="grow">${esc(l.name)}<br><span class="muted mono" style="font-size:11px">${esc(l.id)}</span></span>${l.generated ? `<span class="badge accent">✨</span>` : ""}</button>`).join("")).join("");
+	};
+	draw();
+	$("#lq").addEventListener("input", draw);
+	$("#llist").addEventListener("click", (e) => { const b = e.target.closest("[data-layout]"); if (b) { selected = b.dataset.layout; draw(); openLayout(selected); } });
+	$("#newLayout").addEventListener("click", () => {
+		const id = prompt("Layout id (app.<app id>, site.<host>, sub.<app>.<name>, takeover.<name>)", "site.example.com");
+		if (!id) return;
+		if (!/^(system(\.[\w.-]+)?|app\.[\w.-]+|site\.[\w.-]+|sub\.[\w.-]+|takeover\.[\w.-]+)$/.test(id)) return toast("Use the naming convention, e.g. site.example.com");
+		selected = id; editLayout(TEMPLATE(id), true);
+	});
+	if (selected && layouts.some((l) => l.id === selected)) openLayout(selected);
+}
+async function openLayout(id) { editLayout(await api("GET", `/layouts/${encodeURIComponent(id)}`), false); }
+function editLayout(l, isNew) {
+	const meta = l.generated ? `<span class="badge accent">✨ ${esc(l.generated.source ?? "generated")}${l.generated.appVersion ? ` · v${esc(l.generated.appVersion)}` : ""}</span>` : `<span class="badge">hand-written</span>`;
+	$("#editor").innerHTML = `<div class="row" style="margin-bottom:10px"><h2 class="grow" style="margin:0">${esc(l.name ?? l.id)} <span class="muted mono" style="font-weight:400">${esc(l.id)}</span></h2>${meta}</div>
+		<textarea id="json" spellcheck="false" aria-label="Layout JSON">${esc(JSON.stringify(l, null, 2))}</textarea>
+		<div class="row" style="margin-top:10px"><button class="btn" id="saveL">Save</button><button class="btn ghost" id="fmtL">Format</button><span class="grow"></span>${isNew ? "" : `<button class="btn danger" id="delL">Delete</button>`}</div>`;
+	const ta = $("#json");
+	ta.addEventListener("keydown", (e) => { if (e.key === "Tab") { e.preventDefault(); ta.setRangeText("  ", ta.selectionStart, ta.selectionEnd, "end"); } if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); $("#saveL").click(); } });
+	$("#fmtL").addEventListener("click", () => { try { ta.value = JSON.stringify(JSON.parse(ta.value), null, 2); } catch (err) { toast(`Not valid JSON: ${err.message}`); } });
+	$("#saveL").addEventListener("click", async () => {
+		let obj; try { obj = JSON.parse(ta.value); } catch (err) { return toast(`Not valid JSON: ${err.message}`); }
+		const r = await act(() => api("PUT", `/layouts/${encodeURIComponent(obj.id || l.id)}`, obj));
+		if (r?.ok) { toast(r.created ? "Created" : "Saved"); selected = obj.id || l.id; viewLayouts(); }
+	});
+	$("#delL")?.addEventListener("click", async () => {
+		if (!confirm(`Delete ${l.id}? Its file is removed.`)) return;
+		await act(() => api("DELETE", `/layouts/${encodeURIComponent(l.id)}`), "Deleted");
+		selected = null; viewLayouts();
+	});
+}
+
+// ---------- Secrets ----------
+async function viewSecrets() {
+	const { secrets } = await api("GET", "/secrets");
+	const names = Object.keys(secrets).sort();
+	$("#main").innerHTML = `<h1>Keys & secrets</h1><p class="sub">API keys your layouts use as {{secret.NAME}}. They're stored in your system's credential store and only ever sent to the hosts each one is declared for. Values never come back out.</p>
+		<div class="card">${names.length ? `<table><thead><tr><th>Name</th><th>Status</th><th>Used by</th><th>Sent only to</th><th></th></tr></thead><tbody>${names.map((n) => { const s = secrets[n]; return `<tr>
+			<td class="mono">${esc(n)}${s.description ? `<div class="muted" style="font-family:inherit">${esc(s.description)}</div>` : ""}${/^https?:\/\//.test(s.url ?? "") ? ` <a href="${esc(s.url)}" target="_blank" rel="noopener">get one</a>` : ""}</td>
+			<td>${s.stored ? `<span class="badge ok">stored</span>` : `<span class="badge warn">missing</span>`}</td>
+			<td class="muted">${s.usedBy.map(esc).join(", ")}</td><td class="mono muted">${(s.hosts ?? []).map(esc).join(", ") || "—"}</td>
+			<td><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-set="${esc(n)}">${s.stored ? "Replace" : "Add"}</button>${s.stored ? `<button class="btn danger" data-rm="${esc(n)}">Remove</button>` : ""}</div></td></tr>`; }).join("")}</tbody></table>` : `<div class="empty">No layout uses a secret yet.</div>`}</div>
+		<div class="card"><h2>Add any secret</h2><div class="row"><input id="sname" placeholder="NAME (e.g. GITHUB_TOKEN)" class="mono"><input id="sval" type="password" placeholder="Value" class="grow" autocomplete="off"><button class="btn" id="sadd">Save</button></div></div>`;
+	$("#main").onclick = async (e) => {
+		const set = e.target.closest("[data-set]")?.dataset.set;
+		if (set) { $("#sname").value = set; $("#sval").focus(); return; }
+		const rm = e.target.closest("[data-rm]")?.dataset.rm;
+		if (rm && confirm(`Remove ${rm}?`)) { await act(() => api("DELETE", `/secrets/${encodeURIComponent(rm)}`), `Removed ${rm}`); viewSecrets(); }
+	};
+	$("#sadd").addEventListener("click", async () => {
+		const name = $("#sname").value.trim(), value = $("#sval").value;
+		if (!name || !value) return toast("Name and value, please");
+		const r = await act(() => api("POST", "/secrets", { name, value }));
+		if (r?.ok) { toast(`Saved ${name}`); viewSecrets(); }
+	});
+}
+
+// ---------- AI ----------
+async function viewAi() {
+	const l = await api("GET", "/llm");
+	$("#main").innerHTML = `<h1>AI providers</h1><p class="sub">AI keys use <b>${esc(l.inUse)}</b>${l.override ? " (picked on the deck)" : ""}; ✨ Set up uses <b>${esc(l.setup)}</b>${l.fallback ? `; fallback <b>${esc(l.fallback)}</b>` : ""}. Change roles in Settings.</p>
+		<div class="card"><table><thead><tr><th>Provider</th><th>Model</th><th>Endpoint</th><th></th></tr></thead><tbody>${l.providers.map((p) => `<tr>
+			<td><b>${esc(p.name)}</b> <span class="muted mono">${esc(p.id)}</span> ${p.id === l.inUse ? `<span class="badge accent">in use</span>` : ""}${p.local ? ` <span class="badge">local</span>` : ""}</td>
+			<td class="mono">${esc(p.model ?? "default")}</td><td class="mono muted" style="overflow-wrap:anywhere">${esc(p.baseUrl)}</td>
+			<td><div class="row" style="justify-content:flex-end">${p.local ? "" : `<button class="btn ghost" data-pkey="${esc(p.id)}">API key</button>`}<button class="btn ghost" data-test="${esc(p.id)}">Test</button>${p.id === l.inUse ? "" : `<button class="btn" data-use="${esc(p.id)}">Use</button>`}</div></td></tr>`).join("")}</tbody></table>
+			<div class="row" style="margin-top:12px"><button class="btn ghost" data-test="">Test every role</button>${l.override ? `<button class="btn ghost" data-use="default">Back to default</button>` : ""}</div>
+			<pre id="aiout" class="logs" style="margin-top:12px"></pre></div>`;
+	$("#main").onclick = async (e) => {
+		const use = e.target.closest("[data-use]")?.dataset.use;
+		if (use !== undefined) { await act(() => api("POST", "/llm/use", { provider: use === "default" ? null : use }), "Switched"); return viewAi(); }
+		const test = e.target.closest("[data-test]");
+		if (test) { $("#aiout").textContent = "Testing…"; const r = await act(() => api("POST", "/llm/test", { provider: test.dataset.test })); if (r) $("#aiout").textContent = r.results.map((x) => `${x.ok ? "✓" : "✗"} ${x.provider} (${x.usedFor.join(", ")}) ${x.ms} ms  ${x.ok ? `${x.model ?? ""} → ${x.reply}` : x.error}`).join("\n"); return; }
+		const key = e.target.closest("[data-pkey]")?.dataset.pkey;
+		if (key) { const v = prompt(`API key for ${key} (stored in your credential store)`); if (v) await act(() => api("POST", "/secrets", { name: key, value: v }), "Saved"); }
+	};
+}
+
+// ---------- Elgato ----------
+async function viewElgato() {
+	$("#main").innerHTML = `<h1>Stream Deck plugins</h1><p class="sub">Trigger actions from your other Stream Deck plugins (OBS, Hue, Spotify …) from ContextDeck keys, through Elgato's MCP server.</p>
+		<div class="card"><h2>Set up once</h2><ol class="steps"><li>Stream Deck 7.4 or later, and Node.js installed (<span class="mono">node -v</span>).</li><li>Stream Deck → Preferences → General → <b>Enable MCP Deck</b>. A profile called <b>MCP Actions</b> appears.</li><li>Put the actions you want on that profile (give each a clear description).</li><li>They show up below. Use one on a key: <span class="mono">{"type": "elgato", "tool": "…"}</span></li></ol></div>
+		<div class="card" id="tools"><div class="empty">Starting Elgato's MCP server… (first time can take ~20 s)</div></div>`;
+	const r = await act(() => api("GET", "/elgato/tools?refresh"));
+	if (!r) return;
+	if (!r.ok) { $("#tools").innerHTML = `<div class="empty">${esc(r.error)}</div>`; return; }
+	$("#tools").innerHTML = r.tools.length ? `<table><thead><tr><th>Tool</th><th>What it does</th><th></th></tr></thead><tbody>${r.tools.map((t) => `<tr><td class="mono">${esc(t.name)}</td><td class="muted">${esc(t.description ?? "")}</td><td><div class="row" style="justify-content:flex-end"><button class="btn ghost" data-copy='${esc(JSON.stringify({ type: "elgato", tool: t.name }))}'>Copy action</button><button class="btn" data-run="${esc(t.name)}">Run</button></div></td></tr>`).join("")}</tbody></table>` : `<div class="empty">No actions on the MCP Actions profile yet.</div>`;
+	$("#tools").onclick = async (e) => {
+		const run = e.target.closest("[data-run]")?.dataset.run;
+		if (run) await act(() => api("POST", "/elgato/run", { tool: run }), (x) => x.ok ? `Ran ${run}${x.result ? `: ${x.result}` : ""}` : x.error);
+		const copy = e.target.closest("[data-copy]")?.dataset.copy;
+		if (copy) { await navigator.clipboard.writeText(copy).catch(() => {}); toast("Action copied. Paste it into a key's \"action\"."); }
+	};
+}
+
+// ---------- Browser ----------
+async function viewBrowser() {
+	const b = await api("GET", "/browser");
+	$("#main").innerHTML = `<h1>Browser</h1><p class="sub">The ContextDeck extension tells the deck exactly which site you're on: on Linux it's required for site layouts, on macOS and Windows it's faster and works with every browser.</p>
+		<div class="card"><h2>Status</h2><p style="margin:0">${b.connected ? `<span class="badge ok">connected</span> ${esc(b.browser ?? "")} · last report ${b.ageSeconds}s ago` : `<span class="badge warn">not connected</span> The deck reads tabs from the OS where it can.`}</p></div>
+		<div class="card"><h2>Chrome, Edge, Brave, Arc, Vivaldi, Opera</h2><ol class="steps"><li>Open <span class="mono">chrome://extensions</span> (or edge://, brave:// …) and turn on <b>Developer mode</b>.</li><li><b>Load unpacked</b> → choose <span class="mono">${esc(b.extensionFolder)}/chrome</span></li><li>In the page that opens, press <b>Connect</b>, then <b>Allow</b> on your Stream Deck.</li></ol></div>
+		<div class="card"><h2>Firefox</h2><ol class="steps"><li>Open <span class="mono">about:debugging#/runtime/this-firefox</span> → <b>Load Temporary Add-on</b>.</li><li>Pick <span class="mono">${esc(b.extensionFolder)}/firefox/manifest.json</span>, then Connect and Allow. (Temporary add-ons are removed when Firefox quits until the extension is signed.)</li></ol></div>`;
+}
+
+// ---------- Settings ----------
+async function viewSettings() {
+	const { settings: s } = await api("GET", "/settings");
+	const l = await api("GET", "/llm");
+	const opts = (list, v) => list.map(([id, name]) => `<option value="${esc(id)}" ${id === v ? "selected" : ""}>${esc(name)}</option>`).join("");
+	const prov = l.providers.map((p) => [p.id, p.name]);
+	$("#main").innerHTML = `<h1>Settings</h1><p class="sub">Saved to ~/.contextdeck/config.json.</p>
+		<div class="grid2"><div class="card">
+			<label class="f" for="s_llm">AI keys use</label><select id="s_llm">${opts(prov, s.llm ?? "anthropic")}</select>
+			<label class="f" for="s_setup">✨ Set up uses</label><select id="s_setup">${opts(prov, s.setupLlm ?? s.llm ?? "anthropic")}</select>
+			<label class="f" for="s_fb">Fallback</label><select id="s_fb"><option value="">none</option>${opts(prov, s.fallbackLlm ?? "")}</select>
+			<label class="f" for="s_auto">New apps</label><select id="s_auto">${opts([["key", "Show a ✨ Set up key"], ["auto", "Set up automatically"], ["off", "Do nothing"]], s.autoSetup ?? "key")}</select>
+			<label class="f" for="s_research">Web research for ✨ Set up</label><select id="s_research">${opts([["none", "Off (model knowledge + menus)"], ["brave", "Brave Search"], ["tavily", "Tavily"], ["exa", "Exa"], ["searxng", "SearXNG"], ["openrouter-online", "OpenRouter :online"]], s.research?.provider ?? "none")}</select>
+			<label class="f" for="s_cmd">On Windows/Linux, "cmd" in layouts means</label><select id="s_cmd">${opts([["ctrl", "Ctrl"], ["win", "Windows / Super key"]], s.cmdKey ?? "ctrl")}</select>
+			<label class="f" for="s_accent">Accent colour</label><input id="s_accent" type="color" value="${esc(s.accent ?? "#F97316")}">
+			<div class="row" style="margin-top:14px"><button class="btn" id="saveS">Save</button></div>
+		</div><div class="card"><h2>Everything</h2><textarea id="sjson" spellcheck="false" aria-label="Settings JSON" style="min-height:380px">${esc(JSON.stringify(s, null, 2))}</textarea><div class="row" style="margin-top:10px"><button class="btn ghost" id="saveJ">Save JSON</button></div></div></div>`;
+	const save = async (obj) => { const r = await act(() => api("PUT", "/settings", { settings: obj })); if (r?.ok) { toast("Saved"); viewSettings(); } };
+	$("#saveS").addEventListener("click", () => {
+		const n = { ...s, llm: $("#s_llm").value, setupLlm: $("#s_setup").value, autoSetup: $("#s_auto").value, cmdKey: $("#s_cmd").value, accent: $("#s_accent").value.toUpperCase(), research: { ...(s.research ?? {}), provider: $("#s_research").value } };
+		if ($("#s_fb").value) n.fallbackLlm = $("#s_fb").value; else delete n.fallbackLlm;
+		save(n);
+	});
+	$("#saveJ").addEventListener("click", () => { try { save(JSON.parse($("#sjson").value)); } catch (e) { toast(`Not valid JSON: ${e.message}`); } });
+}
+
+// ---------- Logs ----------
+async function viewLogs() {
+	$("#main").innerHTML = `<h1>Logs</h1><p class="sub">What the plugin has been doing (newest first).</p><div class="card"><div class="logs" id="logs"></div></div>`;
+	const tick = async () => {
+		const { logs } = await api("GET", "/logs").catch(() => ({ logs: [] }));
+		$("#logs").innerHTML = logs.slice().reverse().map((l) => `<div><span class="muted">${esc(l.at.slice(11, 19))}</span> ${esc(l.msg)}</div>`).join("") || `<div class="empty">Nothing yet.</div>`;
+	};
+	await tick();
+	timer = setInterval(() => { if (!document.hidden) tick(); }, 2000);
+}
+
+const VIEWS = { deck: viewDeck, layouts: viewLayouts, secrets: viewSecrets, ai: viewAi, elgato: viewElgato, browser: viewBrowser, settings: viewSettings, logs: viewLogs };
+(async () => {
+	if (!TOKEN) { $("#main").innerHTML = `<div class="card empty">Open the app from your deck (hold the AI key → App) or run <span class="mono">~/.contextdeck/deck ui</span>.</div>`; return; }
+	try { status = await api("GET", "/status"); } catch (e) { $("#main").innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return; }
+	if (!VIEWS[current]) current = "deck";
+	go(current);
+})();
+</script>
+</body>
+</html>

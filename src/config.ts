@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { levelOf } from "./resolve";
+export { levelOf as levelOfLayout };
 import type { Action, Config, LayoutDef } from "./types";
 
 export const HOME_DIR = process.env.CONTEXTDECK_HOME ?? join(homedir(), ".contextdeck");
@@ -11,13 +12,15 @@ export const HOME_DIR = process.env.CONTEXTDECK_HOME ?? join(homedir(), ".contex
 export const CONFIG_PATH = existsSync(join(HOME_DIR, "config.json")) || !existsSync(join(HOME_DIR, "layouts.json")) ? join(HOME_DIR, "config.json") : join(HOME_DIR, "layouts.json");
 export const TOKEN_PATH = join(HOME_DIR, "token");
 export const LAYOUTS_DIR = join(HOME_DIR, "layouts");
-const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+export const PLUGIN_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
+/** The app (local web UI): in the plugin bundle, or the source tree when running from src/. */
+export const UI_DIR = [join(PLUGIN_DIR, "ui"), join(PLUGIN_DIR, "com.var.contextdeck.sdPlugin", "ui")].find((d) => existsSync(join(d, "index.html"))) ?? join(PLUGIN_DIR, "ui");
 export const DEFAULTS_DIR = join(PLUGIN_DIR, "defaults");
 
 /** Folder for each level inside layouts/. */
 export const LEVEL_DIRS = { system: "system", app: "apps", sub: "sites", takeover: "takeovers" } as const;
 
-const ACTION_TYPES = new Set(["keys", "type", "shell", "open", "applescript", "script", "http", "mode", "layout", "flag", "state", "overlay", "closeOverlay", "claude", "llm", "llmSelect", "copy", "sequence", "menu", "setup", "deckMenu", "reload", "editLayout", "page", "secretSet", "elgato"]);
+const ACTION_TYPES = new Set(["keys", "type", "shell", "open", "applescript", "script", "http", "mode", "layout", "flag", "state", "overlay", "closeOverlay", "claude", "llm", "llmSelect", "copy", "sequence", "menu", "setup", "deckMenu", "reload", "editLayout", "page", "secretSet", "elgato", "ui"]);
 
 function checkAction(a: Action | undefined, where: string, errors: string[]) {
 	if (!a) return;
@@ -63,6 +66,9 @@ export function ensureHome(): void {
 	if (!existsSync(join(HOME_DIR, "config.json")) && !existsSync(join(HOME_DIR, "layouts.json")) && existsSync(DEFAULTS_DIR)) installDefaults(DEFAULTS_DIR, HOME_DIR);
 	if (!existsSync(TOKEN_PATH)) writeFileSync(TOKEN_PATH, randomBytes(24).toString("hex"), { mode: 0o600 });
 	installCli(join(PLUGIN_DIR, "bin", "deck.mjs"), HOME_DIR);
+	// The browser extension, unpacked, somewhere you can find it (Load unpacked / about:debugging).
+	const ext = join(PLUGIN_DIR, "extension");
+	if (existsSync(ext)) try { cpSync(ext, join(HOME_DIR, "extension"), { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
 /** ~/.contextdeck/deck (deck.cmd on Windows): runs the bundled CLI with the Node that runs the plugin. Rewritten on every start, so it follows Node upgrades. */
@@ -216,4 +222,19 @@ export function watchConfig(onChange: () => void): () => void {
 	const a = watch(HOME_DIR, (_e, file) => { if (!file || ["config.json", "layouts.json"].includes(file.toString())) fire(); });
 	const b = watch(LAYOUTS_DIR, { recursive: true }, (_e, file) => { if (!file || file.toString().endsWith(".json")) fire(); });
 	return () => { a.close(); b.close(); };
+}
+
+/** Reads the settings block of config.json. */
+export function readSettings(path = CONFIG_PATH): Record<string, unknown> {
+	try { return (JSON.parse(stripJsonComments(readFileSync(path, "utf8"))) as { settings?: Record<string, unknown> }).settings ?? {}; } catch { return {}; }
+}
+
+/** Replaces the settings block of config.json, keeping the comment header (comments inside the JSON body aren't kept). */
+export function writeSettings(settings: Record<string, unknown>, path = CONFIG_PATH): void {
+	const text = existsSync(path) ? readFileSync(path, "utf8") : "{}";
+	const at = text.startsWith("{") ? 0 : text.indexOf("\n{") + 1;
+	const header = at > 0 ? text.slice(0, at) : "";
+	let body: Record<string, unknown> = {};
+	try { body = JSON.parse(stripJsonComments(text.slice(at))); } catch { /* start fresh */ }
+	writeFileSync(path, `${header}${JSON.stringify({ ...body, settings }, null, "\t")}\n`);
 }

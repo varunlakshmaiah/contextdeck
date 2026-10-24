@@ -87,7 +87,27 @@ export class Engine extends EventEmitter {
 	setupRunning: string | null = null;
 	llmOverride: string | null = null;
 	reloadConfig: () => void = () => undefined;
-	log: (msg: string) => void = () => undefined;
+	/** Last 200 log lines (for the app's Logs view). */
+	logs: { at: string; msg: string }[] = [];
+	private logSink: (msg: string) => void = () => undefined;
+	get log(): (msg: string) => void {
+		return (msg) => { this.logs.push({ at: new Date().toISOString(), msg }); if (this.logs.length > 200) this.logs.shift(); this.logSink(msg); };
+	}
+	set log(fn: (msg: string) => void) { this.logSink = fn; }
+	/** The ContextDeck app (local web UI), set by the API. */
+	uiUrl = "";
+	openUi() { if (!this.uiUrl) throw new Error("The app isn't available (API not started)"); return this.os.open(this.uiUrl); }
+
+	/** What a deck shows right now, as SVG (for the app's live preview). */
+	preview(deviceId?: string) {
+		const v = (deviceId && this.views.get(deviceId)) || this.active;
+		return this.inView(v, () => ({
+			device: { id: v.id, name: v.name, ...v.geo },
+			page: { index: this.resolved.page, of: this.resolved.pages.length, name: this.resolved.pages[this.resolved.page]?.name },
+			keys: Array.from({ length: v.geo.keys }, (_, i) => this.keyImage(i)),
+			dials: Array.from({ length: v.geo.dials }, (_, i) => this.dialVisual(i).svg),
+		}));
+	}
 	onDiag: () => void = () => undefined;
 	diag: { detector: string; detectErrors: string[]; urlError: string; lastDetect: string; tab?: string } = { detector: "", detectErrors: [], urlError: "", lastDetect: "" };
 
@@ -823,6 +843,7 @@ export class Engine extends EventEmitter {
 			}
 			case "secretSet": { await this.setSecret(a.name); return; }
 			case "deckMenu": return void this.showDeckMenu();
+			case "ui": return this.openUi();
 			case "reload": this.reloadConfig(); this.flash(index >= 0 ? index : 0, "#22C55E", "Reloaded", 900); return;
 			case "editLayout": {
 				const id = a.layout ?? owner?.id ?? this.resolved.layout.id;
@@ -1053,7 +1074,7 @@ export class Engine extends EventEmitter {
 				missing.length
 					? { label: "Add key", sub: missing[0], icon: "key-round", color: NEEDS_KEY_COLOR, action: close({ type: "secretSet", name: missing[0] }) }
 					: { label: "Folder", sub: "all layouts", icon: "folder-open", color: SETUP_COLOR, action: close({ type: "open", target: LAYOUTS_DIR }) },
-				{ label: "Reload", icon: "refresh-cw", color: SETUP_COLOR, action: close({ type: "reload" }) },
+				{ label: "App", sub: "layouts, keys, logs", icon: "app-window", color: SETUP_COLOR, action: close({ type: "ui" }) },
 				{ label: pinned ? "Unpin" : "Pin", sub: pinned ? "back to auto" : "keep this layout", icon: pinned ? "pin-off" : "pin", color: SETUP_COLOR, action: close({ type: "layout", id: pinned ? null : l.id }) },
 				{ label: "AI model", sub: this.llmName, icon: "cpu", color: "#D97757", action: close({ type: "state", key: "__providers", value: true }) },
 				r.pages.length > 1

@@ -49,6 +49,7 @@ type ActionBase =
 	| { type: "secretSet"; name: string }                  // prompt for a secret and store it in the Keychain
 	| { type: "reload" }
 	| { type: "editLayout"; layout?: string }
+	| { type: "ui" }                                       // open the ContextDeck app (local web UI)
 	| { type: "elgato"; tool: string; args?: Record<string, unknown> };  // an action from the Stream Deck app's "MCP Actions" profile (official plugins)             // open a layout's file (default: the key's layout)
 
 export interface LlmAction {

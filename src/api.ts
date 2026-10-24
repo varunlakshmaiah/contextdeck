@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { deleteLayout, writeLayout } from "./config";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { HOME_DIR, UI_DIR, deleteLayout, levelOfLayout, readSettings, validate, writeLayout, writeSettings } from "./config";
 import { askLLM, configuredProviders, providerName, resolveProvider } from "./llm";
 import { usefulEntries } from "./menus";
 import { SECRET_NAME } from "./secrets";
@@ -23,7 +25,12 @@ import type { LayoutDef, OverlaySpec } from "./types";
  *   POST /overlay    OverlaySpec (+ "wait": true to block until a key is pressed)
  *   DELETE /overlay
  *   POST /flash      {"key":7,"color":"#22C55E","text":"Done","ms":2000}
- *   POST /press      {"key":3}         simulate a key press
+ *   POST /press      {"key":3,"device"?,"hold"?}  simulate a key press
+ *   GET  /render[?device=]             SVG of every key/dial (the app's live preview)
+ *   GET  /devices | /logs | /browser
+ *   GET|PUT /settings                  the settings block of config.json
+ *   GET  /layouts | /layouts/:id
+ *   POST /ui/open                      open the app in your browser
  *   POST /setup      {"force":false,"update":false}  auto-configure the app/site in front (waits; returns the result)
  *   POST /page       {"page":"next"|"prev"|"smart"|"sub"|"app"|"system"|<id>}
  *   POST /reload
@@ -57,6 +64,7 @@ export function startApi(engine: Engine, port: number, token: string) {
 			if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
 			const url = new URL(req.url ?? "/", "http://localhost");
 			if (req.method === "GET" && (url.pathname === "/ui" || url.pathname.startsWith("/ui/"))) return serveUi(res, url.pathname);
+			if (url.pathname === "/favicon.ico") { res.writeHead(204); return res.end(); }
 			if (req.method === "POST" && url.pathname === "/pair") {
 				if (pairing) return send(res, 409, { ok: false, error: "Another pairing request is waiting on the deck" });
 				const client = String(((await readJson(req)) as { client?: string }).client ?? "A client").replace(/[^\w .()-]/g, "").slice(0, 40) || "A client";
@@ -210,10 +218,37 @@ export function startApi(engine: Engine, port: number, token: string) {
 				return send(res, 200, { ok: true });
 			}
 			if (route === "POST /press") {
-				const k = Number((body as { key: number }).key);
-				engine.keyDown(k);
-				setTimeout(() => engine.keyUp(k), 60);
+				const b = body as { key: number; device?: string; hold?: boolean };
+				const k = Number(b.key);
+				engine.keyDown(k, b.device);
+				setTimeout(() => engine.keyUp(k, b.device), b.hold ? (engine.settings.holdMs ?? 500) + 150 : 60);
 				return send(res, 200, { ok: true });
+			}
+			// ---------- the app (local web UI) ----------
+			if (route === "GET /render") return send(res, 200, engine.preview(url.searchParams.get("device") ?? undefined));
+			if (route === "GET /devices") return send(res, 200, { devices: engine.devices() });
+			if (route === "GET /logs") return send(res, 200, { logs: engine.logs });
+			if (route === "POST /ui/open") { await engine.openUi(); return send(res, 200, { ok: true }); }
+			if (route === "GET /browser") {
+				const r = engine.browserReport;
+				return send(res, 200, { connected: !!r, ageSeconds: r ? Math.round((Date.now() - r.at) / 1000) : null, browser: r?.browser ?? null, focused: r?.focused ?? null, extensionFolder: join(HOME_DIR, "extension") });
+			}
+			if (route === "GET /settings") return send(res, 200, { settings: readSettings() });
+			if (route === "PUT /settings") {
+				const s = (body as { settings?: unknown }).settings;
+				if (!s || typeof s !== "object" || Array.isArray(s)) return send(res, 400, { ok: false, error: "settings must be an object" });
+				const errors = validate({ ...engine.config, settings: s });
+				if (errors.length) return send(res, 400, { ok: false, errors });
+				writeSettings(s as Record<string, unknown>);
+				engine.reloadConfig();
+				return send(res, 200, { ok: true, errors: engine.configErrors });
+			}
+			if (route === "GET /layouts") {
+				return send(res, 200, { layouts: engine.config.layouts.map((l) => ({ id: l.id, name: l.name ?? l.id, level: levelOfLayout(l), color: l.color, file: engine.sources[l.id] ?? null, generated: l.generated ?? null, match: l.match ?? null, keys: (l.keys ?? []).filter(Boolean).length, pages: (l.pages ?? []).map((p) => p.name) })) });
+			}
+			if (layoutMatch && req.method === "GET") {
+				const l = engine.config.layouts.find((x) => x.id === layoutMatch[1]);
+				return l ? send(res, 200, l) : send(res, 404, { error: "no such layout" });
 			}
 			return send(res, 404, { error: `no route ${route}` });
 		} catch (e) {
@@ -221,6 +256,7 @@ export function startApi(engine: Engine, port: number, token: string) {
 		}
 	});
 	server.on("error", (e) => engine.log(`API error: ${e.message}`));
+	engine.uiUrl = `http://127.0.0.1:${port}/ui#token=${token}`;
 	server.listen(port, "127.0.0.1", () => engine.log(`API on http://127.0.0.1:${port}`));
 	return server;
 }
@@ -234,9 +270,17 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
 	});
 }
 
-function serveUi(res: ServerResponse, _path: string) {
-	res.writeHead(404, { "content-type": "text/plain" });
-	res.end("UI not built");
+/** The app is one self-contained page; the token travels in the URL fragment, which browsers never send. */
+function serveUi(res: ServerResponse, path: string) {
+	if (path !== "/ui" && path !== "/ui/") { res.writeHead(404); return res.end(); }
+	try {
+		const html = readFileSync(join(UI_DIR, "index.html"));
+		res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'", "x-frame-options": "DENY" });
+		res.end(html);
+	} catch {
+		res.writeHead(404, { "content-type": "text/plain" });
+		res.end("The ContextDeck app isn't in this build.");
+	}
 }
 
 function send(res: ServerResponse, status: number, body: unknown) {
