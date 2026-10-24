@@ -1,12 +1,12 @@
 {
   "name": "contextdeck",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "description": "ContextDeck: context-aware Stream Deck plugin for macOS, Windows and Linux (OpenDeck), with a local app, browser extension, API, CLI and MCP bridge.",
   "scripts": {
     "icons": "node scripts/build-icons.mjs",
-    "build": "npm run icons && rollup -c && node scripts/build-extension.mjs",
+    "build": "npm run icons && node scripts/build-profiles.mjs && rollup -c && node scripts/build-extension.mjs",
     "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart com.var.contextdeck\"",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",

@@ -6,11 +6,18 @@ import {
 type JsonObject = { [key: string]: any };
 import type { DeviceInfo, Engine } from "../../engine";
 import { DEVICE_KINDS, DIALS_BY_TYPE } from "../../resolve";
+import type { SwipePages } from "../../swipe";
+
+/** Profiles bundled with the plugin (scripts/build-profiles.mjs), by device type. */
+export const PROFILE_BY_TYPE: Record<number, string> = { 7: "profiles/contextdeck-plus", 0: "profiles/contextdeck-mk2", 1: "profiles/contextdeck-mini", 2: "profiles/contextdeck-xl" };
+/** device id → device type, for switching back to the right profile. */
+export const deviceTypes = new Map<string, number>();
 
 /** The deck an action lives on, as the engine sees it. */
 export function deviceOf(d: { id: string; name?: string; type?: number; size?: { columns: number; rows: number } }): DeviceInfo {
 	const cols = d.size?.columns || 4, rows = d.size?.rows || 2;
 	const type = d.type ?? 7;
+	deviceTypes.set(d.id, type);
 	return { id: d.id, name: d.name, kind: DEVICE_KINDS[type] ?? `type${type}`, cols, rows, keys: cols * rows, dials: DIALS_BY_TYPE[type] ?? 0 };
 }
 
@@ -20,7 +27,7 @@ type S = JsonObject;
 @action({ UUID: "com.var.contextdeck.key" })
 export class ContextKey extends SingletonAction<S> {
 	private slots = new Map<string, { index: number; device: string }>();
-	constructor(private engine: Engine) { super(); }
+	constructor(private engine: Engine, private swipe?: SwipePages) { super(); }
 
 	override onWillAppear(ev: WillAppearEvent<S>) {
 		if (!ev.action.isKey() || ev.action.isInMultiAction()) return;
@@ -30,6 +37,7 @@ export class ContextKey extends SingletonAction<S> {
 		const index = c.row * cols + c.column;
 		const a = ev.action;
 		const dev = deviceOf(a.device as never);
+		this.swipe?.appeared(dev.id, ev.payload.settings?.sdPage);
 		this.slots.set(a.id, { index, device: dev.id });
 		this.engine.addKey({ id: a.id, setImage: (i) => a.setImage(i), setTitle: (t) => a.setTitle(t), showAlert: () => a.showAlert(), showOk: () => a.showOk() }, index, dev);
 	}
@@ -42,13 +50,14 @@ export class ContextKey extends SingletonAction<S> {
 @action({ UUID: "com.var.contextdeck.dial" })
 export class ContextDial extends SingletonAction<S> {
 	private slots = new Map<string, { index: number; device: string }>();
-	constructor(private engine: Engine) { super(); }
+	constructor(private engine: Engine, private swipe?: SwipePages) { super(); }
 
 	override onWillAppear(ev: WillAppearEvent<S>) {
 		if (!ev.action.isDial()) return;
 		const index = ev.action.coordinates.column;
 		const a = ev.action;
 		const dev = deviceOf(a.device as never);
+		this.swipe?.appeared(dev.id, ev.payload.settings?.sdPage);
 		this.slots.set(a.id, { index, device: dev.id });
 		this.engine.addDial({
 			id: a.id,

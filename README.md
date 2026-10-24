@@ -23,7 +23,7 @@ It works on every Stream Deck (Mini, MK.2, XL, Neo, Pedal, +, Studio, + XL and M
 ## Install
 
 1. Double-click `com.var.contextdeck.streamDeckPlugin`. On Linux, use OpenDeck → Plugins → install from file.
-2. Make a **ContextDeck** profile. Put **Context Key** on every key and **Context Dial** on every dial.
+2. Accept the **ContextDeck** profile Stream Deck offers to install (bundled for the +, MK.2, Mini and XL; it's switched to automatically). On other decks, make a profile with **Context Key** on every key and **Context Dial** on every dial.
 3. Let it see apps and press keys:
    - **macOS:** System Settings → Privacy & Security → **Accessibility** → turn on **Stream Deck**. Allow it to control your browser the first time it asks.
    - **Windows:** nothing to do.
@@ -97,6 +97,10 @@ The deck remembers your page per context, so going back to YouTube returns to th
 // layouts/subs/sub.com.apple.mail.compose.json
 { "id": "sub.com.apple.mail.compose", "level": "sub", "match": { "bundleId": "com.apple.mail", "sub": "*Re:*" }, "keys": [ … ] }
 ```
+
+## Pages and swiping
+
+Swipe the touch strip (or tap its outer edges) to change ContextDeck's page; the `1/3` on the last dial shows where you are. Stream Deck keeps swipes for itself, so the bundled profile has five identical Stream Deck pages: when one appears, ContextDeck knows which way you swiped, turns its own page, and moves back to the middle page so you can keep swiping either way (`settings.swipeRecenter: false` turns the jump back off). Decks without a touch strip use the page key.
 
 ## Every Stream Deck
 

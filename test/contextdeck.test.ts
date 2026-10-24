@@ -584,3 +584,58 @@ test("Elgato bridge: list and run official plugins' actions through an MCP serve
 		assert.equal(e.snapshot().keys.length, 8);
 	} finally { await b.stop(); }
 });
+
+test("swipe: Stream Deck page changes become next/prev, and the middle page is restored without double-turning", async () => {
+	const { SwipePages, MIDDLE_PAGE } = await import("../src/swipe");
+	let t = 0;
+	const turns: string[] = [], recentred: string[] = [];
+	const s = new SwipePages((d, dev) => turns.push(`${dev}:${d}`), (dev) => void recentred.push(dev), () => t);
+	for (let i = 0; i < 12; i++) s.appeared("plus", MIDDLE_PAGE);      // profile opens on the middle page: no turn
+	assert.deepEqual(turns, []);
+	s.appeared("plus", 3); s.appeared("plus", 3);                     // swipe left → next (once, though 12 actions appear)
+	assert.deepEqual(turns, ["plus:next"]);
+	assert.deepEqual(recentred, ["plus"]);
+	s.appeared("plus", MIDDLE_PAGE);                                   // our own jump back: ignored
+	assert.deepEqual(turns, ["plus:next"]);
+	s.appeared("plus", 1);                                             // swipe right → prev
+	assert.deepEqual(turns, ["plus:next", "plus:prev"]);
+	t = 5000; s.appeared("plus", 0);                                   // recentre never happened; later swipes still count
+	assert.deepEqual(turns, ["plus:next", "plus:prev", "plus:prev"]);
+	s.appeared("xl", undefined);                                       // a hand-made profile (no sdPage): ignored
+	const { e } = rig();
+	e.updateContext({ bundleId: "com.google.Chrome", app: "Chrome", url: "https://www.youtube.com/watch?v=1" });
+	e.swipe("next");
+	assert.equal(e.snapshot().page.index, 1);
+	e.swipe("prev");
+	assert.equal(e.snapshot().page.index, 0);
+});
+
+test("bundled profiles: V3 zip, every key and dial filled, pages numbered, registered in the manifest", async () => {
+	const { execFileSync } = await import("node:child_process");
+	const { mkdtempSync, readdirSync, readFileSync } = await import("node:fs");
+	const { tmpdir } = await import("node:os");
+	const { buildProfile, DEVICES, SWIPE_PAGES } = await import("../scripts/build-profiles.mjs");
+	const plus = DEVICES.find((d: { type: number }) => d.type === 7);
+	const dir = mkdtempSync(join(tmpdir(), "cdp-"));
+	buildProfile(plus, join(dir, "p.streamDeckProfile"));
+	execFileSync("unzip", ["-q", "p.streamDeckProfile", "-d", "x"], { cwd: dir });
+	const pkg = JSON.parse(readFileSync(join(dir, "x", "package.json"), "utf8"));
+	assert.equal(pkg.DeviceModel, "20GBD9901");
+	assert.deepEqual(pkg.RequiredPlugins, ["com.var.contextdeck"]);
+	const [sd] = readdirSync(join(dir, "x", "Profiles"));
+	assert.match(sd, /^[0-9A-F-]{36}\.sdProfile$/);
+	const top = JSON.parse(readFileSync(join(dir, "x", "Profiles", sd, "manifest.json"), "utf8"));
+	assert.equal(top.Version, "3.0");
+	assert.equal(top.Pages.Pages.length, SWIPE_PAGES);
+	top.Pages.Pages.forEach((p: string, i: number) => {
+		const m = JSON.parse(readFileSync(join(dir, "x", "Profiles", sd, "Profiles", p, "manifest.json"), "utf8"));
+		const [keypad, encoder] = m.Controllers;
+		assert.equal(Object.keys(keypad.Actions).length, 8);
+		assert.equal(Object.keys(encoder.Actions).length, 4);
+		assert.equal(encoder.Type, "Encoder");
+		assert.equal(keypad.Actions["3,1"].UUID, "com.var.contextdeck.key");
+		assert.equal(encoder.Actions["3,0"].Settings.sdPage, i);
+	});
+	const manifest = JSON.parse(readFileSync("com.var.contextdeck.sdPlugin/manifest.json", "utf8"));
+	assert.ok(manifest.Profiles.some((p: { Name: string; DeviceType: number }) => p.Name === "profiles/contextdeck-plus" && p.DeviceType === 7));
+});

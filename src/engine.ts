@@ -548,7 +548,7 @@ export class Engine extends EventEmitter {
 		}
 		return {
 			svg: renderDial({ label: label || " ", value, bar, hint, icon: d.icon, color: c, bg: this.bg, stripe, ...nav }),
-			desc: { rotate: label || "Turn", push: d.press ? "Press" : "", touch: pages > 1 ? "Tap outer edges: pages" : d.touch ? "Tap" : "" },
+			desc: { rotate: label || "Turn", push: d.press ? "Press" : "", touch: pages > 1 ? "Swipe: pages" : d.touch ? "Tap" : "" },
 		};
 	}
 
@@ -705,6 +705,12 @@ export class Engine extends EventEmitter {
 		const d = this.resolved.dials[index];
 		if (d?.kind === "volume" && !d.press) return void this.os.toggleMute().catch(() => undefined);
 		if (d?.press) void this.exec(d.press, -1, this.resolved.dialOwners[index]);
+	}
+
+	/** A swipe on the deck (detected from Stream Deck page changes; see swipe.ts). */
+	swipe(dir: "next" | "prev", device?: string) {
+		this.touch(device);
+		if (this.resolved.pages.length > 1) this.goPage(dir);
 	}
 
 	/** Touch strip: tap the outer edges to change page; long-touch anywhere = next page; otherwise the dial's touch action. */

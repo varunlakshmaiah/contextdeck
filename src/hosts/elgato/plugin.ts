@@ -2,12 +2,13 @@ import streamDeck from "@elgato/streamdeck";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { platform } from "../../platform";
 import { join } from "node:path";
-import { ContextDial, ContextKey } from "./actions";
+import { ContextDial, ContextKey, PROFILE_BY_TYPE, deviceTypes } from "./actions";
+import { MIDDLE_PAGE, SwipePages } from "../../swipe";
 import { startApi } from "../../api";
 import { CONFIG_PATH, HOME_DIR, ensureHome, loadConfig, readToken, watchConfig } from "../../config";
 import { Engine } from "../../engine";
 
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 const log = streamDeck.logger.createScope("ContextDeck");
 streamDeck.logger.setLevel("info");
 
@@ -64,8 +65,16 @@ engine.deps.saveSetupState = (st) => { try { writeFileSync(SETUP_STATE, JSON.str
 load();
 watchConfig(() => { engine.log("config/layouts changed, reloading"); load(); });
 
-streamDeck.actions.registerAction(new ContextKey(engine));
-streamDeck.actions.registerAction(new ContextDial(engine));
+// Swiping the touch strip flips the bundled profile's Stream Deck pages; turn that into ContextDeck pages.
+const swipe = new SwipePages(
+	(dir, device) => engine.swipe(dir, device),
+	async (device) => {
+		const profile = PROFILE_BY_TYPE[deviceTypes.get(device) ?? -1];
+		if (profile && engine.settings.swipeRecenter !== false) await streamDeck.profiles.switchToProfile(device, profile, MIDDLE_PAGE);
+	},
+);
+streamDeck.actions.registerAction(new ContextKey(engine, swipe));
+streamDeck.actions.registerAction(new ContextDial(engine, swipe));
 
 startApi(engine, engine.settings.apiPort ?? 47811, readToken());
 engine.start();

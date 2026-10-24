@@ -204,6 +204,7 @@ export interface Settings extends LlmSettings {
 	holdMs?: number;
 	apiPort?: number;
 	browsers?: string[];                  // extra app ids to treat as browsers
+	swipeRecenter?: boolean;              // after a swipe, jump back to the middle Stream Deck page (default true)
 	cmdKey?: "ctrl" | "win";              // Windows/Linux: what "cmd" in layouts means (default ctrl; "mod" is always cmd on macOS, ctrl elsewhere)
 	autoSetup?: "key" | "auto" | "off";   // key = show a "Set up" key on unconfigured apps (default); auto = configure on first open
 	setupSlot?: number;                   // which key shows "Set up" (default 6)
