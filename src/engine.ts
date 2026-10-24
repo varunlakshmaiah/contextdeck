@@ -271,7 +271,7 @@ export class Engine extends EventEmitter {
 	}
 
 	updateContext(patch: Partial<Context>) {
-		this.ctx = { ...this.ctx, ...patch, now: new Date() };
+		this.ctx = { ...this.ctx, ...patch, os: this.os.id, now: new Date() };
 		this.recompute();
 	}
 
@@ -710,6 +710,7 @@ export class Engine extends EventEmitter {
 	// ---------- actions ----------
 	/** owner = the layout the pressed key came from (for secrets, modes and editing). */
 	async exec(a: Action, index: number, owner?: LayoutDef | null): Promise<void> {
+		a = a.on?.[this.os.id] ?? a;
 		const own = owner !== undefined ? owner : index >= 0 ? this.currentSlots()[index]?.owner ?? null : null;
 		try {
 			await this.run(a, index, own);
@@ -722,6 +723,7 @@ export class Engine extends EventEmitter {
 	}
 
 	private async run(a: Action, index: number, owner: LayoutDef | null): Promise<void> {
+		a = a.on?.[this.os.id] ?? a;
 		const t = (s: string) => template(s, this.scope());
 		switch (a.type) {
 			case "keys": return this.os.sendKeys(a.keys);

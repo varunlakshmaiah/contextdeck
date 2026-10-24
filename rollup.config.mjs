@@ -20,6 +20,11 @@ export default [
 		],
 	},
 	{
+		input: "src/cli.ts",
+		output: { file: `${sdPlugin}/bin/deck.mjs` },
+		plugins: [typescript({ include: ["src/**/*.ts"] }), resolveNode(), !isWatching && terser()],
+	},
+	{
 		input: "mcp/server.ts",
 		output: { file: `${sdPlugin}/mcp/contextdeck-mcp.mjs`, banner: "#!/usr/bin/env node" },
 		plugins: [typescript({ include: ["mcp/**/*.ts", "src/**/*.ts"] }), json(), resolveNode(), commonjs(), !isWatching && terser()],

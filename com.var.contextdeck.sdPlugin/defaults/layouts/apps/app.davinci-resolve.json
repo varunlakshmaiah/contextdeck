@@ -3,7 +3,11 @@
 	"name": "Resolve",
 	"color": "#EF4444",
 	"match": {
-		"bundleId": "com.blackmagic-design.DaVinciResolve*"
+		"bundleId": [
+			"com.blackmagic-design.DaVinciResolve*",
+			"resolve.exe",
+			"resolve"
+		]
 	},
 	"defaultMode": "edit",
 	"modes": {

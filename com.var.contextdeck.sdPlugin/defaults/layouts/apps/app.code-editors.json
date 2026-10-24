@@ -7,7 +7,16 @@
 			"com.microsoft.VSCode",
 			"com.todesktop.230313mzl4w4u92",
 			"dev.zed.Zed",
-			"com.exafunction.windsurf"
+			"com.exafunction.windsurf",
+			"code.exe",
+			"cursor.exe",
+			"zed.exe",
+			"windsurf.exe",
+			"code",
+			"code-oss",
+			"cursor",
+			"dev.zed.zed",
+			"windsurf"
 		]
 	},
 	"keys": [
@@ -62,7 +71,17 @@
 			},
 			"action": {
 				"type": "open",
-				"target": "Terminal"
+				"target": "Terminal",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "wt"
+					},
+					"linux": {
+						"type": "shell",
+						"cmd": "x-terminal-emulator || gnome-terminal || konsole"
+					}
+				}
 			}
 		},
 		{
@@ -91,11 +110,31 @@
 			"icon": "panels-top-left",
 			"cw": {
 				"type": "keys",
-				"keys": "cmd+alt+right"
+				"keys": "cmd+alt+right",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+pagedown"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+pagedown"
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",
-				"keys": "cmd+alt+left"
+				"keys": "cmd+alt+left",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+pageup"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+pageup"
+					}
+				}
 			}
 		},
 		{

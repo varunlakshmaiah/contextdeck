@@ -10,7 +10,8 @@
 		"bundleId": [
 			"com.apple.finder",
 			"com.apple.loginwindow"
-		]
+		],
+		"os": "mac"
 	},
 	"keys": [
 		{

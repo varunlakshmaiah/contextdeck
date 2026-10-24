@@ -99,10 +99,9 @@ export function acceleratorToChord(text: string): string | undefined {
 	const MOD: Record<string, string> = { ctrl: "ctrl", control: "ctrl", strg: "ctrl", shift: "shift", umschalt: "shift", alt: "alt", win: "win", windows: "win", super: "win", cmd: "cmd" };
 	const mods: string[] = [];
 	for (const p of parts) { const m = MOD[p]; if (!m) return undefined; mods.push(m); }
-	const NAMES: Record<string, string> = { del: "fwddelete", delete: "fwddelete", ins: "kcins", enter: "return", esc: "esc", escape: "esc", tab: "tab", space: "space", backspace: "delete", bksp: "delete",
+	const NAMES: Record<string, string> = { del: "fwddelete", delete: "fwddelete", ins: "insert", insert: "insert", prtsc: "print", print: "print", enter: "return", esc: "esc", escape: "esc", tab: "tab", space: "space", backspace: "delete", bksp: "delete",
 		left: "left", right: "right", up: "up", down: "down", home: "home", end: "end", pgup: "pageup", pageup: "pageup", pgdn: "pagedown", pagedown: "pagedown", plus: "=", minus: "-", "num +": "=", "num -": "-" };
 	let k = NAMES[key] ?? key;
-	if (k === "kcins") return undefined;
 	if (/^f([1-9]|1[0-9])$/.test(k) || /^[a-z0-9]$/.test(k) || ["[", "]", "=", "-", ",", ".", "/", ";", "'", "\\", "`"].includes(k) || ["return", "tab", "space", "delete", "fwddelete", "esc", "left", "right", "up", "down", "home", "end", "pageup", "pagedown"].includes(k)) {
 		if (!mods.length && /^[a-z0-9]$/.test(k)) return undefined;
 		return [...mods, k].join("+");

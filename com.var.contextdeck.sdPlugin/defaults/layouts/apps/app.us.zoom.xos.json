@@ -4,7 +4,11 @@
 	"color": "#3B82F6",
 	"priority": 5,
 	"match": {
-		"bundleId": "us.zoom.xos"
+		"bundleId": [
+			"us.zoom.xos",
+			"zoom.exe",
+			"zoom"
+		]
 	},
 	"keys": [
 		{
@@ -13,7 +17,17 @@
 			"color": "#EF4444",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+shift+a"
+				"keys": "cmd+shift+a",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+a"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+a"
+					}
+				}
 			}
 		},
 		{
@@ -21,7 +35,17 @@
 			"icon": "video-off",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+shift+v"
+				"keys": "cmd+shift+v",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+v"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+v"
+					}
+				}
 			}
 		},
 		{
@@ -29,7 +53,17 @@
 			"icon": "monitor-up",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+shift+s"
+				"keys": "cmd+shift+s",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+s"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+s"
+					}
+				}
 			}
 		},
 		{
@@ -57,7 +91,17 @@
 			"color": "#EF4444",
 			"hold": {
 				"type": "keys",
-				"keys": "cmd+w"
+				"keys": "cmd+w",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+q"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+q"
+					}
+				}
 			}
 		}
 	],

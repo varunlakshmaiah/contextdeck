@@ -1,9 +1,9 @@
 {
 	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
 	"Name": "ContextDeck",
-	"Version": "0.4.0.0",
+	"Version": "0.5.0.0",
 	"Author": "Var",
-	"Description": "Keys and dials that redraw for whatever you're doing — app, website, mode, or anything you push in. Driven by ~/.contextdeck/layouts.json, with a local API and an MCP bridge for Claude.",
+	"Description": "Context-aware keys and dials for every app and website, on macOS, Windows and Linux (OpenDeck). Three levels (system, app, site), pages, live info keys, any LLM, and ✨ one-press setup for new apps.",
 	"UUID": "com.var.contextdeck",
 	"Category": "ContextDeck",
 	"CategoryIcon": "imgs/plugin/category-icon",
@@ -17,6 +17,10 @@
 		{
 			"Platform": "mac",
 			"MinimumVersion": "12"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
 		}
 	],
 	"Nodejs": {

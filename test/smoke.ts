@@ -8,13 +8,13 @@ import { join } from "node:path";
 
 const home = mkdtempSync(join(process.env.SCRATCH!, "cd04-"));
 process.env.CONTEXTDECK_HOME = home;
-const { installDefaults, loadConfig, readToken, ensureHome } = await import("../src/config");
+const { installDefaults, loadConfig, readToken, ensureHome, installCli } = await import("../src/config");
 const { Engine } = await import("../src/engine");
 const { startApi } = await import("../src/api");
 const { memoryStore } = await import("../src/secrets");
 installDefaults("com.var.contextdeck.sdPlugin/defaults", home);
 ensureHome();
-copyFileSync("com.var.contextdeck.sdPlugin/scripts/deck.sh", join(home, "deck")); chmodSync(join(home, "deck"), 0o755);
+installCli(join(process.cwd(), "com.var.contextdeck.sdPlugin/bin/deck.mjs"), home);
 
 const mock = createServer((req, res) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ choices: [{ message: { content: "OK" } }] })); }); }).listen(47334);
 const e = new Engine();

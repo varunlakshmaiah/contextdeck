@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { deleteLayout, writeLayout } from "./config";
 import { askLLM, configuredProviders, providerName, resolveProvider } from "./llm";
 import { usefulEntries } from "./menus";
+import { SECRET_NAME } from "./secrets";
 import type { Engine } from "./engine";
 import type { LayoutDef, OverlaySpec } from "./types";
 
@@ -24,7 +25,9 @@ import type { LayoutDef, OverlaySpec } from "./types";
  *   POST /page       {"page":"next"|"prev"|"smart"|"sub"|"app"|"system"|<id>}
  *   POST /reload
  *   GET  /secrets                      declared secrets (names, hosts, where used) and which are missing — never values
- *   POST /secrets/refresh              re-read the Keychain after `deck secret set`
+ *   POST /secrets    {"name","value"}  store a secret in the OS credential store (values never come back out)
+ *   DELETE /secrets/:name
+ *   POST /secrets/refresh              re-read the credential store
  *   GET  /menus[?bundleId=..&all=1]    the front app's menu items with real shortcuts
  *   GET  /llm                          providers, which one is in use
  *   POST /llm/use    {"provider":"openrouter"} | {"provider":null}
@@ -60,6 +63,23 @@ export function startApi(engine: Engine, port: number, token: string) {
 			}
 			if (route === "POST /page") { engine.goPage((body as { page?: string | number }).page ?? "next"); return send(res, 200, engine.snapshot().page); }
 			if (route === "POST /reload") { engine.reloadConfig(); return send(res, 200, { ok: true, errors: engine.configErrors }); }
+			if (route === "POST /secrets") {
+				const { name, value } = body as { name?: string; value?: string };
+				if (!name || !value) return send(res, 400, { ok: false, error: "name and value are required" });
+				const isProvider = configuredProviders(engine.settings).includes(name) || !!resolveProvider(engine.settings, name);
+				if (!SECRET_NAME.test(name) && !isProvider) return send(res, 400, { ok: false, error: "Secret names are UPPER_SNAKE_CASE (e.g. GITHUB_TOKEN), or an LLM provider id (e.g. openrouter)" });
+				if (SECRET_NAME.test(name)) await engine.deps.secrets.set(name, value); else await engine.os.secretSet(name, value);
+				engine.deps.secrets.forget?.(name);
+				await engine.refreshMissingSecrets();
+				return send(res, 200, { ok: true, missing: engine.snapshot().missingSecrets });
+			}
+			const secretMatch = /^\/secrets\/([\w.-]+)$/.exec(url.pathname);
+			if (secretMatch && req.method === "DELETE") {
+				await engine.os.secretDelete(secretMatch[1]);
+				engine.deps.secrets.forget?.(secretMatch[1]);
+				await engine.refreshMissingSecrets();
+				return send(res, 200, { ok: true, removed: secretMatch[1] });
+			}
 			if (route === "POST /secrets/refresh") { engine.deps.secrets.forget?.(); await engine.refreshMissingSecrets(); return send(res, 200, { missing: engine.snapshot().missingSecrets }); }
 			if (route === "GET /secrets") {
 				const out: Record<string, { description?: string; url?: string; hosts?: string[]; usedBy: string[]; stored: boolean }> = {};

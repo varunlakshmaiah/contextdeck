@@ -20,7 +20,7 @@ const XDO_KEYS: Record<string, string> = {
 	return: "Return", enter: "KP_Enter", tab: "Tab", space: "space", delete: "BackSpace", backspace: "BackSpace", fwddelete: "Delete", esc: "Escape", escape: "Escape",
 	left: "Left", right: "Right", up: "Up", down: "Down", home: "Home", end: "End", pageup: "Prior", pagedown: "Next",
 	"=": "equal", "-": "minus", ",": "comma", ".": "period", "/": "slash", ";": "semicolon", "'": "apostrophe", "[": "bracketleft", "]": "bracketright", "\\": "backslash", "`": "grave",
-	volumeup: "XF86AudioRaiseVolume", volumedown: "XF86AudioLowerVolume", mute: "XF86AudioMute", playpause: "XF86AudioPlay", nexttrack: "XF86AudioNext", prevtrack: "XF86AudioPrev",
+	print: "Print", insert: "Insert", volumeup: "XF86AudioRaiseVolume", volumedown: "XF86AudioLowerVolume", mute: "XF86AudioMute", playpause: "XF86AudioPlay", nexttrack: "XF86AudioNext", prevtrack: "XF86AudioPrev",
 };
 const XDO_MODS: Record<string, string> = { ctrl: "ctrl", shift: "shift", alt: "alt", win: "super" };
 

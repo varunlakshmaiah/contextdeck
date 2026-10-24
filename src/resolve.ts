@@ -105,6 +105,7 @@ export function matchScore(m: Match | undefined, ctx: Context): number {
 			score += Math.min(3, best / 12);
 		}
 	}
+	if (m.os) { if (!arr(m.os).includes(ctx.os ?? "mac")) return -1; score += 1; }
 	if (m.time) { if (!inTime(m.time, ctx.now)) return -1; score += 2; }
 	if (m.days) { if (!m.days.includes(ctx.now.getDay())) return -1; score += 1; }
 	for (const f of arr(m.flags)) { if (!ctx.flags[f]) return -1; score += 10; }

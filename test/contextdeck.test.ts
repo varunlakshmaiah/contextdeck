@@ -8,7 +8,7 @@ import { Engine, type DialSurface, type KeySurface } from "../src/engine";
 import { colorFor, evaluate, extract, format, unsafeReason } from "../src/info";
 import { askLLM, configuredProviders, parseChoices, resolveProvider } from "../src/llm";
 import { chordToAppleScript, parseAppName, prettyBundle } from "../src/platform/mac";
-import { axToChord, menuClickScript, parseMenuDump, usefulEntries } from "../src/menus";
+import { axToChord, menuClickScript, parseAcceleratorDump, parseMenuDump, usefulEntries } from "../src/menus";
 import { loadIcons, renderDial, renderKey } from "../src/render";
 import { htmlToText, rankHits, type Digest } from "../src/research";
 import { composeSmart, glob, inTime, levelOf, resolve, template, zonesFor, DEFAULT_ZONES, PLUS } from "../src/resolve";
@@ -17,6 +17,9 @@ import { memoryStore, MissingSecretError, withSecrets } from "../src/secrets";
 import { buildPrompt, chordKey, planToLayout, targetForApp, targetForSite } from "../src/setup";
 import type { Action, Config, Context, LayoutDef } from "../src/types";
 import { setPlatform } from "../src/platform";
+import { parseChord } from "../src/platform/chords";
+import { chordToVk } from "../src/platform/win";
+import { chordToXdo, parseXprop, prettyName } from "../src/platform/linux";
 import { macPlatform } from "../src/platform/mac";
 
 // The fixtures are macOS bundle ids; adapter-specific tests set their own platform.
@@ -56,7 +59,16 @@ const flatten = (a: Action | undefined): Action[] => (!a ? [] : a.type === "sequ
 test("every icon exists and every chord compiles", () => {
 	const missing = [...everything(cfg)].map((x) => x.icon).filter((i): i is string => !!i && !icons[i]);
 	assert.deepEqual([...new Set(missing)], []);
-	for (const x of everything(cfg)) for (const a of x.actions.flatMap(flatten)) if (a.type === "keys") for (const c of a.keys.split(/\s+/)) assert.doesNotThrow(() => chordToAppleScript(c), c);
+	const compilers = { mac: (c: string) => chordToAppleScript(c), win: (c: string) => chordToVk(parseChord(c)), linux: (c: string) => chordToXdo(parseChord(c)) };
+	let variants = 0;
+	for (const x of everything(cfg)) for (const base of x.actions.flatMap(flatten)) {
+		for (const os of ["mac", "win", "linux"] as const) {
+			const a = flatten(base.on?.[os] ?? base).at(-1)!;
+			if (base.on?.[os]) variants++;
+			if (a.type === "keys") for (const c of a.keys.split(/\s+/)) assert.doesNotThrow(() => compilers[os](c), `${os}: ${c}`);
+		}
+	}
+	assert.ok(variants > 30, "defaults carry Windows/Linux variants");
 });
 
 test("glob, time and template helpers", () => {
@@ -522,4 +534,37 @@ test("engine: two decks keep their own pages; a deck without dials gets a page k
 	e.keyDown(14, "mk2"); e.keyUp(14, "mk2");
 	assert.equal(e.snapshot().page.index, 2, "MK.2 kept its own page (1 → 2)");
 	assert.deepEqual(e.devices().map((d) => d.id).sort(), ["default", "mk2"]);
+});
+
+// ---------- Windows / Linux ----------
+test("Windows/Linux: app ids pick the same layouts; per-OS actions; mac-only layouts stay on the Mac", () => {
+	const win = (p: Partial<Context>) => ctx({ os: "win", ...p });
+	assert.equal(resolve(cfg, win({ bundleId: "chrome.exe", app: "Google Chrome", url: "https://www.youtube.com/watch?v=1" })).levels.sub?.id, "site.youtube.com");
+	assert.equal(resolve(cfg, win({ bundleId: "code.exe", app: "Visual Studio Code" })).levels.app?.id, "app.code-editors");
+	assert.equal(resolve(cfg, ctx({ os: "linux", bundleId: "org.gnome.ptyxis", app: "Ptyxis" })).levels.app?.id, "app.terminals");
+	const morning = ctx({ bundleId: "com.apple.finder", app: "Finder", now: new Date(2026, 9, 24, 8, 0) });
+	assert.equal(resolve(cfg, morning).levels.app?.id, "app.desktop.morning");
+	assert.notEqual(resolve(cfg, { ...morning, os: "win" }).levels.app?.id, "app.desktop.morning");
+	const shot = resolve(cfg, ctx()).levels.system!.keys!.find((k) => k?.label === "Screenshot")!;
+	assert.deepEqual(shot.action?.on?.win, { type: "keys", keys: "win+shift+s" });
+});
+
+test("Windows chords → virtual keys; cmd follows settings.cmdKey; accelerators parse", () => {
+	assert.deepEqual(chordToVk(parseChord("cmd+shift+t")), { mods: [0x11, 0x10], key: 0x54, ext: false });
+	assert.deepEqual(chordToVk(parseChord("cmd+t"), "win"), { mods: [0x5b], key: 0x54, ext: false });
+	assert.deepEqual(chordToVk(parseChord("mod+v"), "win"), { mods: [0x11], key: 0x56, ext: false }, "mod is always ctrl off the Mac");
+	assert.equal(chordToVk(parseChord("alt+left")).ext, true);
+	assert.throws(() => chordToVk(parseChord("fn+f1")));
+	const menus = parseAcceleratorDump(["&File\u001eNew &Window\tCtrl+Shift+N\ttrue", "Edit\u001eDelete\tDel\tfalse", "Bad line"].join("\r\n"));
+	assert.deepEqual(menus, [{ path: ["File", "New Window"], chord: "ctrl+shift+n", enabled: true }, { path: ["Edit", "Delete"], chord: "fwddelete", enabled: false }]);
+});
+
+test("Linux: xprop parsing, xdotool key names, app names", () => {
+	const out = 'WM_CLASS(STRING) = "Navigator", "firefox"\n_NET_WM_NAME(UTF8_STRING) = "Inbox \\"Var\\" — Mozilla Firefox"\n_NET_WM_PID(CARDINAL) = 4242';
+	assert.deepEqual(parseXprop(out), { appId: "firefox", title: 'Inbox "Var" — Mozilla Firefox', pid: 4242 });
+	assert.deepEqual(chordToXdo(parseChord("cmd+shift+]")), { mods: ["ctrl", "shift"], key: "bracketright" });
+	assert.deepEqual(chordToXdo(parseChord("win+pagedown")), { mods: ["super"], key: "Next" });
+	assert.deepEqual(chordToXdo(parseChord("f5")), { mods: [], key: "F5" });
+	assert.equal(prettyName("google-chrome"), "Google Chrome");
+	assert.equal(prettyName("org.gnome.Nautilus"), "Nautilus");
 });

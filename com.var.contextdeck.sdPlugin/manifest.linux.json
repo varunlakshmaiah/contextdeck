@@ -1,0 +1,9 @@
+{
+	"CodePathLin": "bin/plugin.js",
+	"OS": [
+		{
+			"Platform": "linux",
+			"MinimumVersion": "0"
+		}
+	]
+}

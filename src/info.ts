@@ -145,6 +145,8 @@ export function colorFor(value: unknown, thresholds: InfoSpec["thresholds"]): st
 }
 
 export async function evaluate(spec: InfoSpec, ic: InfoContext, now = Date.now()): Promise<InfoResult> {
+	const alt = spec.on?.[platform().id];
+	if (alt) spec = { ...spec, ...alt, on: undefined };
 	try {
 		const raw = await fetchSource(spec.source, ic);
 		const value = extract(raw, spec.extract);

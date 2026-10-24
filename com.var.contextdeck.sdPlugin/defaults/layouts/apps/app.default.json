@@ -8,7 +8,17 @@
 			"icon": "clapperboard",
 			"action": {
 				"type": "open",
-				"target": "DaVinci Resolve"
+				"target": "DaVinci Resolve",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "C:\\Program Files\\Blackmagic Design\\DaVinci Resolve\\Resolve.exe"
+					},
+					"linux": {
+						"type": "open",
+						"target": "/opt/resolve/bin/resolve"
+					}
+				}
 			}
 		},
 		{
@@ -25,7 +35,17 @@
 			"icon": "calendar",
 			"action": {
 				"type": "open",
-				"target": "Calendar"
+				"target": "Calendar",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "outlookcal:"
+					},
+					"linux": {
+						"type": "open",
+						"target": "gnome-calendar"
+					}
+				}
 			}
 		},
 		{
@@ -33,7 +53,17 @@
 			"icon": "mail",
 			"action": {
 				"type": "open",
-				"target": "Mail"
+				"target": "Mail",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "mailto:"
+					},
+					"linux": {
+						"type": "open",
+						"target": "mailto:"
+					}
+				}
 			}
 		},
 		{
@@ -41,7 +71,17 @@
 			"icon": "notebook-pen",
 			"action": {
 				"type": "open",
-				"target": "Notes"
+				"target": "Notes",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "notepad"
+					},
+					"linux": {
+						"type": "open",
+						"target": "gnome-text-editor"
+					}
+				}
 			}
 		},
 		{
@@ -50,7 +90,17 @@
 			"color": "#D97757",
 			"action": {
 				"type": "open",
-				"target": "Claude"
+				"target": "Claude",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "claude://"
+					},
+					"linux": {
+						"type": "open",
+						"target": "claude://"
+					}
+				}
 			}
 		},
 		{
@@ -58,7 +108,17 @@
 			"icon": "folder-open",
 			"action": {
 				"type": "open",
-				"target": "Finder"
+				"target": "Finder",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "explorer"
+					},
+					"linux": {
+						"type": "open",
+						"target": "~"
+					}
+				}
 			}
 		}
 	],
@@ -68,11 +128,31 @@
 			"icon": "app-window",
 			"cw": {
 				"type": "keys",
-				"keys": "cmd+tab"
+				"keys": "cmd+tab",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+tab"
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",
-				"keys": "cmd+shift+tab"
+				"keys": "cmd+shift+tab",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+shift+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+shift+tab"
+					}
+				}
 			}
 		},
 		{
@@ -80,15 +160,45 @@
 			"icon": "columns-3",
 			"cw": {
 				"type": "keys",
-				"keys": "ctrl+right"
+				"keys": "ctrl+right",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+ctrl+right"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+pagedown"
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",
-				"keys": "ctrl+left"
+				"keys": "ctrl+left",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+ctrl+left"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+pageup"
+					}
+				}
 			},
 			"press": {
 				"type": "keys",
-				"keys": "ctrl+up"
+				"keys": "ctrl+up",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+s"
+					}
+				}
 			}
 		},
 		{

@@ -18,7 +18,12 @@ import type { LlmSettings } from "./llm";
 
 export type Level = "system" | "app" | "sub" | "takeover";
 
-export type Action =
+export type OsName = "mac" | "win" | "linux";
+
+/** Any action can carry per-OS replacements: {"type":"keys","keys":"cmd+[","on":{"win":{"type":"keys","keys":"alt+left"}}}. */
+export type Action = ActionBase & { on?: Partial<Record<OsName, Action>> };
+
+type ActionBase =
 	| { type: "keys"; keys: string }                       // "cmd+shift+4", or a sequence separated by spaces: "cmd+c cmd+v"
 	| { type: "type"; text: string }                       // type literal text
 	| { type: "shell"; cmd: string }                       // login shell (zsh on macOS, $SHELL on Linux, cmd.exe on Windows)
@@ -67,6 +72,7 @@ export type InfoSource =
 
 export interface InfoSpec {
 	source: InfoSource;
+	on?: Partial<Record<OsName, Partial<InfoSpec>>>;   // per-OS replacements (source, extract …)
 	every?: number;                    // refresh interval, seconds (default 60, min 2)
 	extract?: string;                  // "a.b[0].c" JSON path, or "/regex/flags" (group 1)
 	format?: string;                   // template: "{{value}}%", "{{value|pct}}", "{{value|duration}}"
@@ -114,6 +120,7 @@ export type DialDef = {
 );
 
 export interface Match {
+	os?: OsName | OsName[];         // only on these systems
 	bundleId?: string | string[];   // glob, e.g. "com.microsoft.VSCode*"
 	app?: string | string[];        // app name glob
 	url?: string | string[];        // glob against active browser tab URL
@@ -217,6 +224,7 @@ export interface Context {
 	url: string;
 	title: string;
 	sub: string;               // probe output for native apps
+	os?: OsName;
 	flags: Record<string, boolean>;
 	now: Date;
 }

@@ -115,7 +115,17 @@
 			"icon": "scan",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+shift+5"
+				"keys": "cmd+shift+5",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+shift+s"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "print"
+					}
+				}
 			}
 		},
 		{
@@ -123,7 +133,17 @@
 			"icon": "search",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+space"
+				"keys": "cmd+space",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+s"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+f1"
+					}
+				}
 			}
 		},
 		{
@@ -132,7 +152,17 @@
 			"icon": "layout-grid",
 			"action": {
 				"type": "keys",
-				"keys": "ctrl+up"
+				"keys": "ctrl+up",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+s"
+					}
+				}
 			}
 		},
 		{
@@ -140,7 +170,17 @@
 			"icon": "smile",
 			"action": {
 				"type": "keys",
-				"keys": "ctrl+cmd+space"
+				"keys": "ctrl+cmd+space",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+."
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+."
+					}
+				}
 			}
 		},
 		{
@@ -149,7 +189,17 @@
 			"icon": "moon",
 			"action": {
 				"type": "shell",
-				"cmd": "pmset displaysleepnow"
+				"cmd": "pmset displaysleepnow",
+				"on": {
+					"win": {
+						"type": "shell",
+						"cmd": "powershell -NoProfile -WindowStyle Hidden -Command \"(Add-Type -MemberDefinition '[DllImport(\\\"user32.dll\\\")] public static extern int SendMessage(int h, int m, int w, int l);' -Name D -PassThru)::SendMessage(-1, 0x0112, 0xF170, 2)\""
+					},
+					"linux": {
+						"type": "shell",
+						"cmd": "xset dpms force off 2>/dev/null || busctl --user call org.gnome.Shell /org/gnome/ScreenSaver org.gnome.ScreenSaver SetActive b true"
+					}
+				}
 			}
 		},
 		{
@@ -179,7 +229,28 @@
 						"below": 40,
 						"color": "#FBBF24"
 					}
-				]
+				],
+				"on": {
+					"win": {
+						"source": {
+							"type": "command",
+							"cmd": [
+								"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+								"-NoProfile",
+								"-Command",
+								"(Get-CimInstance Win32_Battery).EstimatedChargeRemaining"
+							]
+						},
+						"extract": "/(\\d+)/"
+					},
+					"linux": {
+						"source": {
+							"type": "file",
+							"path": "/sys/class/power_supply/BAT0/capacity"
+						},
+						"extract": "/(\\d+)/"
+					}
+				}
 			}
 		},
 		{
@@ -188,7 +259,17 @@
 			"color": "#71717A",
 			"hold": {
 				"type": "keys",
-				"keys": "ctrl+cmd+q"
+				"keys": "ctrl+cmd+q",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+l"
+					},
+					"linux": {
+						"type": "shell",
+						"cmd": "loginctl lock-session"
+					}
+				}
 			},
 			"sub": "hold"
 		}
@@ -205,11 +286,31 @@
 			"icon": "app-window",
 			"cw": {
 				"type": "keys",
-				"keys": "cmd+tab"
+				"keys": "cmd+tab",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+tab"
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",
-				"keys": "cmd+shift+tab"
+				"keys": "cmd+shift+tab",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+shift+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+shift+tab"
+					}
+				}
 			}
 		},
 		{
@@ -217,15 +318,45 @@
 			"icon": "columns-3",
 			"cw": {
 				"type": "keys",
-				"keys": "ctrl+right"
+				"keys": "ctrl+right",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+ctrl+right"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+pagedown"
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",
-				"keys": "ctrl+left"
+				"keys": "ctrl+left",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+ctrl+left"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+pageup"
+					}
+				}
 			},
 			"press": {
 				"type": "keys",
-				"keys": "ctrl+up"
+				"keys": "ctrl+up",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "win+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "win+s"
+					}
+				}
 			}
 		},
 		{

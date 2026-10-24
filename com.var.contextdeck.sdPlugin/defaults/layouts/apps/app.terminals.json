@@ -7,7 +7,24 @@
 			"com.apple.Terminal",
 			"com.googlecode.iterm2",
 			"com.mitchellh.ghostty",
-			"dev.warp.Warp-Stable"
+			"dev.warp.Warp-Stable",
+			"windowsterminal.exe",
+			"wezterm-gui.exe",
+			"alacritty.exe",
+			"pwsh.exe",
+			"powershell.exe",
+			"cmd.exe",
+			"gnome-terminal-server",
+			"org.gnome.terminal",
+			"org.gnome.ptyxis",
+			"konsole",
+			"org.kde.konsole",
+			"kitty",
+			"alacritty",
+			"com.mitchellh.ghostty",
+			"org.wezfurlong.wezterm",
+			"tilix",
+			"xterm"
 		]
 	},
 	"keys": [
@@ -45,7 +62,17 @@
 			"icon": "eraser",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+k"
+				"keys": "cmd+k",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+l"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+l"
+					}
+				}
 			}
 		},
 		{
@@ -75,7 +102,17 @@
 			"icon": "plus",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+t"
+				"keys": "cmd+t",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+shift+t"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+shift+t"
+					}
+				}
 			}
 		}
 	],
@@ -85,11 +122,31 @@
 			"icon": "panels-top-left",
 			"cw": {
 				"type": "keys",
-				"keys": "cmd+shift+]"
+				"keys": "cmd+shift+]",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+pagedown"
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",
-				"keys": "cmd+shift+["
+				"keys": "cmd+shift+[",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+shift+tab"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+pageup"
+					}
+				}
 			}
 		},
 		{
@@ -113,7 +170,13 @@
 			"icon": "a-large-small",
 			"cw": {
 				"type": "keys",
-				"keys": "cmd+="
+				"keys": "cmd+=",
+				"on": {
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+shift+="
+					}
+				}
 			},
 			"ccw": {
 				"type": "keys",

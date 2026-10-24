@@ -14,7 +14,7 @@ export const MOD_ALIASES: Record<string, Mod> = {
 export const SPECIAL_KEYS = [
 	"return", "enter", "tab", "space", "delete", "backspace", "esc", "escape", "left", "right", "up", "down", "home", "end", "pageup", "pagedown", "fwddelete",
 	"f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15", "f16", "f17", "f18", "f19",
-	"volumeup", "volumedown", "mute", "playpause", "nexttrack", "prevtrack",
+	"volumeup", "volumedown", "mute", "playpause", "nexttrack", "prevtrack", "print", "insert",
 ] as const;
 export const PUNCT_KEYS = ["[", "]", "=", "-", ",", ".", "/", ";", "'", "\\", "`"] as const;
 const KEYS = new Set<string>([...SPECIAL_KEYS, ...PUNCT_KEYS, ..."abcdefghijklmnopqrstuvwxyz0123456789".split("")]);

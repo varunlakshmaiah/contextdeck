@@ -108,6 +108,16 @@ function Front {
 	$h = [CDWin]::GetForegroundWindow()
 	$procId = [CDWin]::Pid($h)
 	$p = Get-Process -Id $procId -ErrorAction SilentlyContinue
+	# Store (UWP) apps live inside ApplicationFrameHost; the real app is a child window from another process.
+	if ($p -and $p.ProcessName -ieq 'ApplicationFrameHost') {
+		try {
+			$kids = $UIA::FromHandle($h).FindAll($TreeScope::Children, [System.Windows.Automation.Condition]::TrueCondition)
+			foreach ($k in $kids) {
+				$kp = $k.Current.ProcessId
+				if ($kp -and $kp -ne $procId) { $p2 = Get-Process -Id $kp -ErrorAction SilentlyContinue; if ($p2) { $p = $p2; $procId = $kp; break } }
+			}
+		} catch {}
+	}
 	$exe = ''; $name = ''; $path = ''
 	if ($p) {
 		$exe = "$($p.ProcessName).exe"
@@ -249,7 +259,7 @@ function Handle($req) {
 		'chords' { foreach ($c in $a.chords) { [CDWin]::Chord([byte[]]@($c.mods), [byte]$c.key, [bool]$c.ext); Start-Sleep -Milliseconds 40 } ; 'ok' }
 		'type' { TypeText $a.text; 'ok' }
 		'clipget' { $v = Get-Clipboard -Raw; if ($null -eq $v) { '' } else { $v } }
-		'clipset' { Set-Clipboard -Value $a.text; 'ok' }
+		'clipset' { if ([string]::IsNullOrEmpty($a.text)) { [System.Windows.Forms.Clipboard]::Clear() } else { Set-Clipboard -Value $a.text }; 'ok' }
 		'notify' { Notify $a.title $a.text; 'ok' }
 		'prompt' { Prompt $a.title $a.message }
 		'volget' { [math]::Round([CDAudio]::Get() * 100) }

@@ -46,7 +46,17 @@
 			"icon": "notebook-pen",
 			"action": {
 				"type": "open",
-				"target": "Notes"
+				"target": "Notes",
+				"on": {
+					"win": {
+						"type": "open",
+						"target": "notepad"
+					},
+					"linux": {
+						"type": "open",
+						"target": "gnome-text-editor"
+					}
+				}
 			}
 		},
 		null,
@@ -57,7 +67,17 @@
 			"color": "#EF4444",
 			"hold": {
 				"type": "keys",
-				"keys": "cmd+w"
+				"keys": "cmd+w",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "ctrl+w"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "ctrl+w"
+					}
+				}
 			}
 		}
 	],

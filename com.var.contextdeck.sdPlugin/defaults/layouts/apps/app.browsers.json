@@ -11,7 +11,23 @@
 			"company.thebrowser.Browser",
 			"com.microsoft.edgemac",
 			"org.mozilla.firefox",
-			"com.vivaldi.Vivaldi"
+			"com.vivaldi.Vivaldi",
+			"chrome.exe",
+			"msedge.exe",
+			"brave.exe",
+			"firefox.exe",
+			"arc.exe",
+			"vivaldi.exe",
+			"opera.exe",
+			"zen.exe",
+			"google-chrome*",
+			"chromium*",
+			"brave-browser*",
+			"firefox*",
+			"microsoft-edge*",
+			"vivaldi*",
+			"zen*",
+			"librewolf"
 		]
 	},
 	"keys": [
@@ -54,7 +70,17 @@
 			"icon": "arrow-left",
 			"action": {
 				"type": "keys",
-				"keys": "cmd+["
+				"keys": "cmd+[",
+				"on": {
+					"win": {
+						"type": "keys",
+						"keys": "alt+left"
+					},
+					"linux": {
+						"type": "keys",
+						"keys": "alt+left"
+					}
+				}
 			}
 		},
 		{
@@ -141,7 +167,17 @@
 					"icon": "arrow-right",
 					"action": {
 						"type": "keys",
-						"keys": "cmd+]"
+						"keys": "cmd+]",
+						"on": {
+							"win": {
+								"type": "keys",
+								"keys": "alt+right"
+							},
+							"linux": {
+								"type": "keys",
+								"keys": "alt+right"
+							}
+						}
 					}
 				},
 				{
@@ -174,7 +210,17 @@
 					"icon": "history",
 					"action": {
 						"type": "keys",
-						"keys": "cmd+y"
+						"keys": "cmd+y",
+						"on": {
+							"win": {
+								"type": "keys",
+								"keys": "ctrl+h"
+							},
+							"linux": {
+								"type": "keys",
+								"keys": "ctrl+h"
+							}
+						}
 					}
 				},
 				{
@@ -182,7 +228,17 @@
 					"icon": "download",
 					"action": {
 						"type": "keys",
-						"keys": "cmd+shift+j"
+						"keys": "cmd+shift+j",
+						"on": {
+							"win": {
+								"type": "keys",
+								"keys": "ctrl+j"
+							},
+							"linux": {
+								"type": "keys",
+								"keys": "ctrl+shift+y"
+							}
+						}
 					}
 				}
 			]
