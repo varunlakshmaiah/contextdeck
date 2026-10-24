@@ -1,5 +1,10 @@
 # ContextDeck
 
+[![CI](https://github.com/varunlakshmaiah/contextdeck/actions/workflows/ci.yml/badge.svg)](https://github.com/varunlakshmaiah/contextdeck/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/varunlakshmaiah/contextdeck)](https://github.com/varunlakshmaiah/contextdeck/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![macOS | Windows | Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
+
 A Stream Deck plugin that redraws its keys and dials from three context levels:
 
 - **system:** the AI key, volume, and OS controls;
@@ -7,6 +12,10 @@ A Stream Deck plugin that redraws its keys and dials from three context levels:
 - **sub:** what's inside that app, such as the website or YouTube video you're on.
 
 It can set itself up for any app or website. ✨ Set up reads the app's real menus, can research its current docs online, and has your chosen AI model build a layout. That layout can include **live info keys** (usage, counts, battery…) and **API actions**, with your keys kept in your system's credential store.
+
+<p align="center"><img src="docs/images/app-deck-xl.png" alt="The ContextDeck app showing a Stream Deck XL with YouTube, browser and system keys" width="820"></p>
+
+**[Download the latest release](https://github.com/varunlakshmaiah/contextdeck/releases/latest)** · [Changelog](CHANGELOG.md) · [Report a bug](https://github.com/varunlakshmaiah/contextdeck/issues/new/choose)
 
 | | macOS | Windows | Linux |
 |---|---|---|---|
@@ -22,7 +31,7 @@ It works on every Stream Deck (Mini, MK.2, XL, Neo, Pedal, +, Studio, + XL and M
 
 ## Install
 
-1. Double-click `com.var.contextdeck.streamDeckPlugin`. On Linux, use OpenDeck → Plugins → install from file.
+1. Download `ContextDeck-<version>.streamDeckPlugin` from [Releases](https://github.com/varunlakshmaiah/contextdeck/releases/latest) and double-click it. On Linux, use OpenDeck → Plugins → install from file.
 2. Accept the **ContextDeck** profile Stream Deck offers to install (bundled for the +, MK.2, Mini and XL; it's switched to automatically). On other decks, make a profile with **Context Key** on every key and **Context Dial** on every dial.
 3. Let it see apps and press keys:
    - **macOS:** System Settings → Privacy & Security → **Accessibility** → turn on **Stream Deck**. Allow it to control your browser the first time it asks.
@@ -64,6 +73,8 @@ Save any file and the deck reloads instantly. An emptied file means that layout 
 | Flag | lowercase kebab | `recording`, `meeting` |
 | Page id | `smart` · `sub` · `app` · `system` · `<layoutId>:<pageName>` | `app.browsers:Tabs` |
 | AI provider id | lowercase preset or your own | `openrouter`, `ollama`, `home-gpu` |
+
+<p align="center"><img src="docs/images/deck-layouts.png" alt="Four Stream Deck + pages: YouTube in a browser, YouTube Studio, a generated Claude app layout, and the system page" width="420"></p>
 
 ## Levels, zones and pages
 
@@ -376,3 +387,11 @@ npm run build       # plugin, CLI, MCP bridge, browser extension
 npm run validate && npm run pack
 npm run link        # symlink into Stream Deck for live dev; `npm run watch` hot-reloads
 ```
+
+## Contributing
+
+Bug reports, layouts for more apps and pull requests are welcome; reports from Windows and Linux are especially useful. See [CONTRIBUTING.md](CONTRIBUTING.md). For security problems, follow [SECURITY.md](SECURITY.md) instead of opening an issue.
+
+## License
+
+[MIT](LICENSE) © Varun Lakshmaiah. Icons are from [Lucide](https://lucide.dev) (ISC license). Third-party notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Elgato and Stream Deck are trademarks of their respective owners; this project isn't affiliated with or endorsed by Elgato.

@@ -1,0 +1,58 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For security problems, please use [private reporting](https://github.com/varunlakshmaiah/contextdeck/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "macOS 26.1, Windows 11 24H2, Ubuntu 24.04 (Wayland) …"
+  - type: dropdown
+    id: host
+    attributes:
+      label: Host app
+      options: [Stream Deck app, OpenDeck]
+    validations:
+      required: true
+  - type: input
+    id: host-version
+    attributes:
+      label: Host app version
+      placeholder: "7.6.0"
+  - type: dropdown
+    id: device
+    attributes:
+      label: Stream Deck model
+      multiple: true
+      options: ["Stream Deck +", "Stream Deck + XL", "Stream Deck MK.2", "Stream Deck XL", "Stream Deck Mini", "Stream Deck Neo", "Stream Deck Studio", "Stream Deck Pedal", "Stream Deck Mobile", Other]
+  - type: input
+    id: version
+    attributes:
+      label: ContextDeck version
+      placeholder: "0.5.1"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant part of `~/.contextdeck/debug.json` or the app's Logs section. Check it for anything private first.
+      render: text

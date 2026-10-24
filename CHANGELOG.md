@@ -2,6 +2,14 @@
 
 All notable changes to ContextDeck. Versions follow the plugin manifest (`0.5.1` = `0.5.1.0`).
 
+## [Unreleased]
+
+### Added
+- Standard repository files: MIT license, contributing guide, security policy, code of conduct, issue and pull request templates, CI and Dependabot.
+
+### Changed
+- Bundled profiles build reproducibly: rebuilding gives byte-identical files.
+
 ## [0.5.1] - 2026-10-24
 
 First public release.
@@ -68,6 +76,7 @@ Before this public repository existed.
 - Any LLM provider.
 - Local API, CLI and MCP bridge.
 
+[Unreleased]: https://github.com/varunlakshmaiah/contextdeck/compare/v0.5.1...HEAD
 [0.5.1]: https://github.com/varunlakshmaiah/contextdeck/releases/tag/v0.5.1
 [0.5.0]: https://github.com/varunlakshmaiah/contextdeck/commit/1b63624
 [0.4.0]: https://github.com/varunlakshmaiah/contextdeck/commit/b58cda9

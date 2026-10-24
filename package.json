@@ -3,7 +3,33 @@
   "version": "0.5.1",
   "private": true,
   "type": "module",
-  "description": "ContextDeck: context-aware Stream Deck plugin for macOS, Windows and Linux (OpenDeck), with a local app, browser extension, API, CLI and MCP bridge.",
+  "description": "Context-aware Stream Deck plugin: keys and dials redraw for the app and website in front, set themselves up with AI, and work on macOS, Windows and Linux (OpenDeck).",
+  "license": "MIT",
+  "author": "Varun Lakshmaiah (https://github.com/varunlakshmaiah)",
+  "homepage": "https://github.com/varunlakshmaiah/contextdeck#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/varunlakshmaiah/contextdeck.git"
+  },
+  "bugs": {
+    "url": "https://github.com/varunlakshmaiah/contextdeck/issues"
+  },
+  "keywords": [
+    "stream-deck",
+    "elgato",
+    "streamdeck-plugin",
+    "opendeck",
+    "context-aware",
+    "macro-pad",
+    "llm",
+    "claude",
+    "mcp",
+    "automation",
+    "productivity"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "icons": "node scripts/build-icons.mjs",
     "build": "npm run icons && node scripts/build-profiles.mjs && rollup -c && node scripts/build-extension.mjs",

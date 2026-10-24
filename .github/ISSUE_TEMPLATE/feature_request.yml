@@ -1,0 +1,22 @@
+name: Feature or layout request
+description: Suggest an improvement, or a built-in layout for an app or site
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: What should ContextDeck do, and in which app or site?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: The problem it solves, or how you'd use it.
+  - type: textarea
+    id: layout
+    attributes:
+      label: Layout (optional)
+      description: If you've built a layout that works, paste its JSON here.
+      render: json

@@ -4,3 +4,8 @@ dist/
 *.sdPlugin/mcp/
 *.sdPlugin/logs/
 out/
+logs/
+.DS_Store
+*.log
+.env
+.env.*
