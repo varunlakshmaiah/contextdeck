@@ -42,7 +42,7 @@
     "test:e2e": "tsx test/smoke.ts && tsx test/extension.ts && tsx test/ui.ts"
   },
   "dependencies": {
-    "@elgato/streamdeck": "^3.0.3"
+    "@elgato/streamdeck": "^3.0.4"
   },
   "devDependencies": {
     "@elgato/cli": "^1.10.3",
